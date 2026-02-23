@@ -1,12 +1,26 @@
 """
 handlers/start.py  -  /start command and Home screen.
 """
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 import core.db as db
-from core.ui import nav_keyboard, BOT_NAME, invite_link, fmt_balance
+from core.ui import nav_keyboard, BOT_NAME, fmt_balance
+
+
+# Persistent bottom keyboard - always visible below the chat input
+# This is what users see pinned at the bottom like in the screenshot
+REPLY_KEYBOARD = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton("💰 Earnings"),   KeyboardButton("📋 Tasks")],
+        [KeyboardButton("📤 Share"),      KeyboardButton("👥 Refer")],
+        [KeyboardButton("💸 Withdraw"),   KeyboardButton("🏠 Home")],
+    ],
+    resize_keyboard=True,      # Makes buttons smaller, fits better on screen
+    persistent=True,           # Stays visible even after user sends a message
+    input_field_placeholder="Choose an option or type a command...",
+)
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -33,14 +47,27 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def nav_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    record = await db.get_user(query.from_user.id)
-    if not record:
-        record, _ = await db.upsert_user(
-            query.from_user.id, query.from_user.username or "", query.from_user.full_name
-        )
-    await _edit_home(query, record)
+    """Called by the 🏠 Home inline button OR the 🏠 Home reply keyboard button."""
+    # Handle both inline callback and reply keyboard text
+    if update.callback_query:
+        query = update.callback_query
+        await query.answer()
+        record = await db.get_user(query.from_user.id)
+        if not record:
+            record, _ = await db.upsert_user(
+                query.from_user.id, query.from_user.username or "", query.from_user.full_name
+            )
+        await _edit_home(query, record)
+    else:
+        # Triggered by reply keyboard "🏠 Home" button
+        record = await db.get_user(update.effective_user.id)
+        if not record:
+            record, _ = await db.upsert_user(
+                update.effective_user.id,
+                update.effective_user.username or "",
+                update.effective_user.full_name,
+                )
+        await _send_home(update, record)
 
 
 async def _send_home(update: Update, record, is_new=False):
@@ -73,7 +100,19 @@ async def _send_home(update: Update, record, is_new=False):
             f"💸 *Withdraw via:* TON · PayPal · Mobile · PUBG UC"
         )
 
-    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=nav_keyboard())
+    # Send with BOTH the inline nav keyboard (on the message) AND
+    # the persistent reply keyboard (pinned at bottom of screen)
+    await update.message.reply_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=REPLY_KEYBOARD,   # Sets the persistent bottom keyboard
+    )
+    # Then send the inline nav as a second message
+    await update.message.reply_text(
+        "👇 *Quick Navigation:*",
+        parse_mode="Markdown",
+        reply_markup=nav_keyboard(),
+    )
 
 
 async def _edit_home(query, record):
@@ -100,7 +139,6 @@ async def _edit_home(query, record):
             f"• Weekly leaderboard prizes"
         )
 
-    # Silently ignore "message not modified" — happens when user taps Home while already on Home
     try:
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=nav_keyboard())
     except BadRequest as e:
