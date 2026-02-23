@@ -18,7 +18,7 @@ REPLY_KEYBOARD = ReplyKeyboardMarkup(
         [KeyboardButton("💸 Withdraw"),   KeyboardButton("🏠 Home")],
     ],
     resize_keyboard=True,      # Makes buttons smaller, fits better on screen
-    persistent=True,           # Stays visible even after user sends a message
+#    persistent=True,           # Stays visible even after user sends a message
     input_field_placeholder="Choose an option or type a command...",
 )
 
