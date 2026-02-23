@@ -1,12 +1,8 @@
 """
-handlers/start.py  ─  /start command and Home screen.
-
-Flow:
-  1. Parse optional referral: /start <user_id>
-  2. Upsert user in DB
-  3. Render home screen (tasks status + nav)
+handlers/start.py  -  /start command and Home screen.
 """
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 import core.db as db
@@ -17,7 +13,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     args = context.args
 
-    # Parse referral
     referred_by = None
     if args:
         try:
@@ -34,11 +29,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         referred_by=referred_by,
     )
 
-    await _send_home(update, context, record, is_new=is_new)
+    await _send_home(update, record, is_new=is_new)
 
 
 async def nav_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Called by the 🏠 Start nav button."""
     query = update.callback_query
     await query.answer()
     record = await db.get_user(query.from_user.id)
@@ -49,21 +43,20 @@ async def nav_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _edit_home(query, record)
 
 
-async def _send_home(update: Update, context: ContextTypes.DEFAULT_TYPE, record, is_new=False):
+async def _send_home(update: Update, record, is_new=False):
     tasks = await db.get_active_tasks()
     completed_ids = await db.get_completed_task_ids(record["user_id"])
     done = len(completed_ids)
     total = len(tasks)
-    tasks_done = record["tasks_done"]
 
-    greeting = "👋 Welcome back" if not is_new else "🎉 Welcome"
+    greeting = "🎉 Welcome" if is_new else "👋 Welcome back"
     text = (
         f"{greeting}, *{record['full_name']}*!\n\n"
         f"✦ *{BOT_NAME}*\n"
-        f"The generous earning bot on Telegram 🤑\n\n"
+        f"The generous earning bot on Telegram\n\n"
     )
 
-    if not tasks_done:
+    if not record["tasks_done"]:
         text += (
             f"⚠️ *Complete all tasks to unlock the bot!*\n"
             f"Progress: {done}/{total} tasks done\n\n"
@@ -80,9 +73,7 @@ async def _send_home(update: Update, context: ContextTypes.DEFAULT_TYPE, record,
             f"💸 *Withdraw via:* TON · PayPal · Mobile · PUBG UC"
         )
 
-    msg = update.message or (update.callback_query.message if update.callback_query else None)
-    if msg:
-        await msg.reply_text(text, parse_mode="Markdown", reply_markup=nav_keyboard())
+    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=nav_keyboard())
 
 
 async def _edit_home(query, record):
@@ -90,11 +81,10 @@ async def _edit_home(query, record):
     completed_ids = await db.get_completed_task_ids(record["user_id"])
     done = len(completed_ids)
     total = len(tasks)
-    tasks_done = record["tasks_done"]
 
     text = f"🏠 *{BOT_NAME}*\n\n"
 
-    if not tasks_done:
+    if not record["tasks_done"]:
         text += (
             f"⚠️ *Complete all tasks to unlock features!*\n"
             f"Progress: {done}/{total} tasks done\n\n"
@@ -110,4 +100,9 @@ async def _edit_home(query, record):
             f"• Weekly leaderboard prizes"
         )
 
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=nav_keyboard())
+    # Silently ignore "message not modified" — happens when user taps Home while already on Home
+    try:
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=nav_keyboard())
+    except BadRequest as e:
+        if "Message is not modified" not in str(e):
+            raise

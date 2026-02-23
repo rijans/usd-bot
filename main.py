@@ -2,11 +2,13 @@ import logging
 import os
 
 from telegram import Update
+from telegram.error import BadRequest
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
     ConversationHandler,
+    ContextTypes,
     MessageHandler,
     filters,
 )
@@ -39,6 +41,15 @@ async def post_init(application: Application) -> None:
     log.info("DB schema ready.")
 
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    err = context.error
+    # Silently ignore harmless "not modified" errors - user tapped same button twice
+    if isinstance(err, BadRequest) and "Message is not modified" in str(err):
+        return
+    # Log everything else as a real error
+    log.error("Unhandled exception", exc_info=err)
+
+
 def main():
     token = os.environ["BOT_TOKEN"]
 
@@ -49,20 +60,28 @@ def main():
         .build()
     )
 
+    # Global error handler
+    app.add_error_handler(error_handler)
+
+    # /start
     app.add_handler(CommandHandler("start", cmd_start))
 
+    # Nav buttons
     app.add_handler(CallbackQueryHandler(nav_start,    pattern="^nav:start$"))
     app.add_handler(CallbackQueryHandler(nav_tasks,    pattern="^nav:tasks$"))
     app.add_handler(CallbackQueryHandler(nav_share,    pattern="^nav:share$"))
     app.add_handler(CallbackQueryHandler(nav_earnings, pattern="^nav:earnings$"))
     app.add_handler(CallbackQueryHandler(nav_refer,    pattern="^nav:refer$"))
 
+    # Tasks
     app.add_handler(CallbackQueryHandler(task_view,   pattern="^task:view:[0-9]+$"))
     app.add_handler(CallbackQueryHandler(task_verify, pattern="^task:verify:[0-9]+$"))
 
+    # Earnings
     app.add_handler(CallbackQueryHandler(claim_daily,      pattern="^earnings:daily$"))
     app.add_handler(CallbackQueryHandler(show_leaderboard, pattern="^earnings:leaderboard$"))
 
+    # Withdraw ConversationHandler
     withdraw_conv = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(nav_withdraw, pattern="^nav:withdraw$"),
@@ -80,6 +99,7 @@ def main():
     )
     app.add_handler(withdraw_conv)
 
+    # Admin ConversationHandler
     admin_conv = ConversationHandler(
         entry_points=[
             CommandHandler("admin", cmd_admin),
