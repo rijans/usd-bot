@@ -69,7 +69,6 @@ Railway auto-deploys on every push. Watch logs in the dashboard.
 
 ---
 
-
 ## ⚙️ Adding Tasks (Channels/Groups to Join)
 
 **Important setup:** The bot must be an **admin** (with member visibility) in every channel/group you add as a task, otherwise membership verification will fail.
