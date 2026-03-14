@@ -14,10 +14,10 @@ from telegram.ext import (
 )
 
 import core.db as db
-from handlers.start    import cmd_start, nav_start
+from handlers.start    import cmd_start, nav_start, REPLY_KEYBOARD
 from handlers.tasks    import nav_tasks, task_view, task_verify
 from handlers.earnings import nav_earnings, claim_daily, show_leaderboard
-from handlers.referral import nav_share, nav_refer
+from handlers.referral import nav_refer, nav_share
 from handlers.withdraw import (
     nav_withdraw, pick_method, enter_destination, cancel_withdraw,
     PICK_METHOD, ENTER_DEST,
@@ -25,8 +25,9 @@ from handlers.withdraw import (
 from handlers.admin import (
     cmd_admin, admin_callback, cancel,
     add_task_title, add_task_chat, add_task_link,
-    broadcast_text,
-    ADD_TASK_TITLE, ADD_TASK_CHAT, ADD_TASK_LINK, BROADCAST_TEXT,
+    edit_setting_value, broadcast_text,
+    ADD_TASK_TITLE, ADD_TASK_CHAT, ADD_TASK_LINK,
+    EDIT_SETTING_VAL, BROADCAST_TEXT,
 )
 
 logging.basicConfig(
@@ -48,68 +49,37 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     log.error("Unhandled exception", exc_info=err)
 
 
-# ── Slash command shortcuts ───────────────────────────────────────────────────
-# These open the inline panel for each section via a small bridge message.
-
-def _open_button(label: str, callback: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton(label, callback_data=callback)]])
-
+# ── Slash command handlers ────────────────────────────────────────────────────
 
 async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📋 *Tasks*", parse_mode="Markdown",
-        reply_markup=_open_button("📋 Open Tasks", "nav:tasks")
-    )
+    await nav_tasks(update, context)
 
 async def cmd_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "💰 *Earnings*", parse_mode="Markdown",
-        reply_markup=_open_button("💰 Open Earnings", "nav:earnings")
-    )
+    await nav_earnings(update, context)
 
 async def cmd_refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👥 *Refer*", parse_mode="Markdown",
-        reply_markup=_open_button("👥 Open Refer", "nav:refer")
-    )
-
-async def cmd_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📤 *Share*", parse_mode="Markdown",
-        reply_markup=_open_button("📤 Open Share", "nav:share")
-    )
+    await nav_refer(update, context)
 
 
-# ── Reply keyboard button handler ────────────────────────────────────────────
-# Handles the persistent bottom keyboard button taps.
-# Each button sends its label as plain text — we match and route it.
+# ── Reply keyboard router ─────────────────────────────────────────────────────
 
 async def reply_kb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
-
-    routes = {
-        "📋 Tasks":    ("📋 *Tasks*",    "nav:tasks",    "📋 Open Tasks"),
-        "💰 Earnings": ("💰 *Earnings*", "nav:earnings", "💰 Open Earnings"),
-        "📤 Share":    ("📤 *Share*",    "nav:share",    "📤 Open Share"),
-        "👥 Refer":    ("👥 *Refer*",    "nav:refer",    "👥 Open Refer"),
-    }
-
     if text == "🏠 Home":
         await nav_start(update, context)
+    elif text == "📋 Tasks":
+        await nav_tasks(update, context)
+    elif text == "💰 Earnings":
+        await nav_earnings(update, context)
+    elif text == "🎯 Refer & Earn":
+        await nav_refer(update, context)
     elif text == "💸 Withdraw":
-        await nav_withdraw(update, context)
-    elif text in routes:
-        label, callback, btn_text = routes[text]
-        await update.message.reply_text(
-            label, parse_mode="Markdown",
-            reply_markup=_open_button(btn_text, callback)
-        )
+        return await nav_withdraw(update, context)
 
 
 def main():
     token = os.environ["BOT_TOKEN"]
-
-    app = (
+    app   = (
         Application.builder()
         .token(token)
         .post_init(post_init)
@@ -123,15 +93,14 @@ def main():
     app.add_handler(CommandHandler("tasks",    cmd_tasks))
     app.add_handler(CommandHandler("earnings", cmd_earnings))
     app.add_handler(CommandHandler("refer",    cmd_refer))
-    app.add_handler(CommandHandler("share",    cmd_share))
     app.add_handler(CommandHandler("admin",    cmd_admin))
 
-    # ── Inline nav buttons ────────────────────────────────────────────────────
+    # ── Inline nav callbacks ──────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(nav_start,    pattern="^nav:start$"))
     app.add_handler(CallbackQueryHandler(nav_tasks,    pattern="^nav:tasks$"))
+    app.add_handler(CallbackQueryHandler(nav_refer,    pattern="^nav:refer$"))
     app.add_handler(CallbackQueryHandler(nav_share,    pattern="^nav:share$"))
     app.add_handler(CallbackQueryHandler(nav_earnings, pattern="^nav:earnings$"))
-    app.add_handler(CallbackQueryHandler(nav_refer,    pattern="^nav:refer$"))
 
     # ── Task callbacks ────────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(task_view,   pattern="^task:view:[0-9]+$"))
@@ -166,21 +135,20 @@ def main():
             CallbackQueryHandler(admin_callback, pattern="^adm:"),
         ],
         states={
-            ADD_TASK_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_title)],
-            ADD_TASK_CHAT:  [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_chat)],
-            ADD_TASK_LINK:  [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_link)],
-            BROADCAST_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_text)],
+            ADD_TASK_TITLE:   [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_title)],
+            ADD_TASK_CHAT:    [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_chat)],
+            ADD_TASK_LINK:    [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_link)],
+            EDIT_SETTING_VAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_setting_value)],
+            BROADCAST_TEXT:   [MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_text)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         per_message=False,
     )
     app.add_handler(admin_conv)
 
-    # ── Reply keyboard text handler ───────────────────────────────────────────
-    # Must be registered AFTER ConversationHandlers so it doesn't
-    # intercept messages meant for conversation steps.
+    # ── Reply keyboard handler — AFTER ConversationHandlers ───────────────────
     KEYBOARD_FILTER = filters.Regex(
-        "^(🏠 Home|📋 Tasks|💰 Earnings|📤 Share|👥 Refer|💸 Withdraw)$"
+        "^(🏠 Home|📋 Tasks|💰 Earnings|🎯 Refer & Earn|💸 Withdraw)$"
     )
     app.add_handler(MessageHandler(filters.TEXT & KEYBOARD_FILTER, reply_kb_handler))
 
