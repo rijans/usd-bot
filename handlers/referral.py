@@ -1,3 +1,10 @@
+"""
+handlers/referral.py  ─  Share & Refer screens (both show the same referral link).
+
+"Share" = quick share button focus
+"Refer" = stats + leaderboard rank focus
+Both display the same invite link.
+"""
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -5,67 +12,98 @@ import core.db as db
 from core.ui import nav_keyboard, invite_link as build_invite, fmt_balance, BOT_NAME
 
 
-async def nav_refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles both callback (inline button) and message (reply keyboard)."""
-    if update.callback_query:
-        query = update.callback_query
-        await query.answer()
-        user_id = query.from_user.id
-        edit_fn = query.edit_message_text
-    else:
-        user_id = update.effective_user.id
-        edit_fn = None
+async def nav_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await _render_share(query)
 
+
+async def nav_refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await _render_refer(query)
+
+
+async def _render_share(query):
+    user_id = query.from_user.id
+    link = build_invite(user_id)
+
+    text = (
+        f"📤 *Share & Earn*\n\n"
+        f"🔗 Your invite link:\n"
+        f"`{link}`\n\n"
+        f"Share this link with friends.\n"
+        f"When they join and complete all tasks, you earn *$0.40* automatically!\n\n"
+        f"💡 *Tips:*\n"
+        f"• Share in groups and channels\n"
+        f"• Post on social media\n"
+        f"• The more you share, the more you earn!"
+    )
+
+    share_text = (
+        f"💰 Join {BOT_NAME} and earn money easily!\n\n"
+        f"✦ Earn $0.40 per referral\n"
+        f"✦ $0.50 free daily bonus\n"
+        f"✦ Weekly prizes for top inviters\n\n"
+        f"👉 {link}"
+    )
+
+    await query.edit_message_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton(
+                "📤 Share Link",
+                switch_inline_query=share_text
+            )],
+            [InlineKeyboardButton("👥 View Referral Stats", callback_data="nav:refer")],
+            [InlineKeyboardButton("🏠 Home", callback_data="nav:start")],
+        ]),
+    )
+
+
+async def _render_refer(query):
+    user_id = query.from_user.id
     user = await db.get_user(user_id)
     if not user:
-        if update.callback_query:
-            await update.callback_query.answer("Please /start first.", show_alert=True)
+        await query.answer("Please /start first.", show_alert=True)
         return
 
-    link        = build_invite(user_id)
+    link = build_invite(user_id)
     weekly_rank = await db.get_weekly_invite_rank(user_id)
-    top         = await db.get_leaderboard(3)
-    ref_reward  = await db.get_setting("referral_reward")
+    top = await db.get_leaderboard(3)
 
-    medals = ["🥇", "🥈", "🥉"]
     text = (
-        f"🎯 *Refer & Earn*\n\n"
+        f"👥 *Referral Program*\n\n"
         f"🔗 Your invite link:\n"
         f"`{link}`\n\n"
         f"📊 *Your Stats:*\n"
         f"✅ Total Invites: *{user['total_invites']}*\n"
         f"💰 Balance: *{fmt_balance(user['balance'])}*\n"
         f"🏆 Weekly Rank: *#{weekly_rank}*\n\n"
-        f"💡 Earn *${ref_reward}* for every friend who joins and completes all tasks.\n\n"
+        f"💡 Earn *$0.40* for every friend who joins and completes tasks.\n\n"
         f"🏆 *Weekly Prizes:*\n"
-        f"🥇 1st–3rd place: $10 each\n"
-        f"🥈 4th–10th place: $5 each\n"
-        f"🥉 11th–20th place: $3 each\n\n"
+        f"🥇 1st–3rd: $10 each\n"
+        f"🥈 4th–10th: $5 each\n"
+        f"🥉 11th–20th: $3 each\n\n"
         f"🔥 *Top 3 This Week:*\n"
     )
     for i, u in enumerate(top, 1):
+        medals = ["🥇", "🥈", "🥉"]
         name = (u["full_name"] or "User")[:20]
         text += f"{medals[i-1]} {name} — {u['total_invites']} invites\n"
 
     share_text = (
         f"💰 Join {BOT_NAME} and earn money easily!\n"
-        f"✦ Earn ${ref_reward} per referral\n"
-        f"✦ Free daily bonus\n"
-        f"✦ Weekly prizes for top inviters\n\n"
         f"👉 {link}"
     )
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📤 Share Your Link", switch_inline_query=share_text)],
-        [InlineKeyboardButton("🏆 Full Leaderboard", callback_data="earnings:leaderboard")],
-        [InlineKeyboardButton("🏠 Home",             callback_data="nav:start")],
-    ])
-
-    if edit_fn:
-        await edit_fn(text, parse_mode="Markdown", reply_markup=keyboard)
-    else:
-        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=keyboard)
-
-
-# Keep nav_share as an alias — routes to the same place
-nav_share = nav_refer
+    await query.edit_message_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📤 Share Link", switch_inline_query=share_text)],
+            [InlineKeyboardButton("🏆 Leaderboard", callback_data="earnings:leaderboard")],
+            [InlineKeyboardButton("🏠 Home", callback_data="nav:start")],
+        ]),
+    )
