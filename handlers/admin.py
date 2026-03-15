@@ -28,6 +28,7 @@ ADD_TASK_CHAT  = 21
 ADD_TASK_LINK  = 22
 BROADCAST_TEXT = 30
 EDIT_SETTING   = 40
+WREJECT_REASON = 50
 
 
 def admin_ids() -> list[int]:
@@ -170,14 +171,25 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("adm:wpay:") or data.startswith("adm:wreject:"):
         action = "paid" if data.startswith("adm:wpay:") else "rejected"
         wid = int(data.split(":")[2])
-        result = await db.process_withdrawal(wid, action)
+        
+        if action == "rejected":
+            context.user_data["wreject_id"] = wid
+            await query.edit_message_text(
+                f"❌ *Reject Withdrawal #{wid}*\n\n"
+                f"Please enter the reason for rejection (this will be sent to the user).\n\n"
+                f"_(Type /cancel to abort)_",
+                parse_mode="Markdown"
+            )
+            return WREJECT_REASON
+
+        result = await db.process_withdrawal(wid, "paid")
         if result:
-            await query.answer(f"Withdrawal {action}!", show_alert=True)
+            await query.answer("Withdrawal paid!", show_alert=True)
             # Notify user
             status_msg = (
-                "✅ *Withdrawal Approved!*\n\nYour payment has been processed."
-                if action == "paid" else
-                "❌ *Withdrawal Rejected.*\n\nYour balance has been refunded."
+                "✅ *Withdrawal Approved!*\n\n"
+                f"Your payment of {fmt_balance(result['amount'])} via {result['method']} "
+                f"to `{result['destination']}` has been successfully processed."
             )
             try:
                 await context.bot.send_message(result["user_id"], status_msg, parse_mode="Markdown")
@@ -407,6 +419,33 @@ async def edit_setting_value(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back to Settings", callback_data="adm:settings")]])
     )
+    return ConversationHandler.END
+
+
+@require_admin
+async def wreject_reason_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    reason = update.message.text.strip()
+    wid = context.user_data.pop("wreject_id", None)
+    if not wid:
+        await update.message.reply_text("❌ Error: Withdrawal ID lost.")
+        return ConversationHandler.END
+        
+    result = await db.process_withdrawal(wid, "rejected", reject_reason=reason)
+    if result:
+        status_msg = (
+            "❌ *Withdrawal Rejected*\n\n"
+            f"Your withdrawal of {fmt_balance(result['amount'])} via {result['method']} was rejected.\n\n"
+            f"Reason: *{reason}*\n\n"
+            f"Your balance has been refunded."
+        )
+        try:
+            await context.bot.send_message(result["user_id"], status_msg, parse_mode="Markdown")
+        except Exception:
+            pass
+        await update.message.reply_text(f"✅ Withdrawal #{wid} rejected. User notified.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back to Withdrawals", callback_data="adm:withdrawals")]]))
+    else:
+        await update.message.reply_text("❌ Failed to process rejection.")
+        
     return ConversationHandler.END
 
 # ─────────────────────────────────────────────────────────────────────────────

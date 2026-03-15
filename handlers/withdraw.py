@@ -25,20 +25,18 @@ PICK_METHOD = 1
 ENTER_DEST  = 2
 
 METHODS = {
-    "ton":    ("🔷 TON Wallet",       "Please enter your *TON wallet address*:"),
-    "paypal": ("💳 PayPal",           "Please enter your *PayPal email address*:"),
-    "mobile": ("📱 Mobile Top-up",    "Please enter your *mobile number* (with country code, e.g. +880XXXXXXXXXX):"),
-    "pubg":   ("🎮 PUBG UC",          "Please enter your *PUBG Player ID*:"),
-    "other":  ("🔗 Other",            "Please describe your *preferred payment method and account details*:"),
+    "ton":    ("🔷 TON (Crypto)",       "Please enter your *TON wallet address*:"),
+    "usdt":   ("💵 USDT (Crypto)",      "Please enter your *USDT wallet address*:"),
+    "stars":  ("⭐️ Telegram Stars",    "Please enter your *Telegram Username* (e.g. @yourname):"),
+    "paypal": ("💳 PayPal",             "Please enter your *PayPal email address*:"),
 }
 
 # Simple validators — just basic sanity checks, not production-grade
 VALIDATORS = {
-    "ton":    lambda s: len(s) >= 20,
+    "ton":    lambda s: len(s) >= 10,
+    "usdt":   lambda s: len(s) >= 10,
+    "stars":  lambda s: s.startswith("@") and len(s) >= 4,
     "paypal": lambda s: "@" in s and "." in s,
-    "mobile": lambda s: bool(re.match(r"^\+?[0-9]{7,15}$", s.replace(" ", ""))),
-    "pubg":   lambda s: len(s) >= 3,
-    "other":  lambda s: len(s) >= 5,
 }
 
 
@@ -132,21 +130,16 @@ async def enter_destination(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = await db.get_user(user_id)
     amount = float(user["balance"])
 
-    # ── UNDER DEVELOPMENT ────────────────────────────────────────────────────
-    # When live: call db.create_withdrawal() and notify admin.
-    # For now: show the development notice and do NOT deduct balance.
-    # ─────────────────────────────────────────────────────────────────────────
+    withdrawal_id = await db.create_withdrawal(user_id, amount, method_label, dest)
 
     text = (
-        f"⚙️ *Withdrawal Request Received*\n\n"
+        f"✅ *Withdrawal Request Submitted*\n\n"
         f"💵 Amount: *{fmt_balance(amount)}*\n"
         f"📤 Method: *{method_label}*\n"
         f"🔑 Destination: `{dest}`\n\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🚧 *This feature is currently under development.*\n\n"
-        f"Your request has been recorded. Withdrawals will be processed once "
-        f"the payment system goes live. Please check back in a few days.\n\n"
-        f"We appreciate your patience! 🙏\n"
+        f"Your request has been recorded and is pending admin review. You will be notified once it is processed.\n\n"
+        f"Thank you for your patience! 🙏\n"
         f"━━━━━━━━━━━━━━━━━━━━━"
     )
 

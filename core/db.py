@@ -95,6 +95,9 @@ async def init_schema():
     async with pool.acquire() as conn:
         await conn.execute(SCHEMA)
         
+        # Add reject_reason column for backward compatibility
+        await conn.execute("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS reject_reason TEXT;")
+        
         # Insert defaults if empty
         await conn.execute(
             """INSERT INTO settings (key, value)
@@ -490,7 +493,7 @@ async def get_pending_withdrawals() -> list[asyncpg.Record]:
         )
 
 
-async def process_withdrawal(withdrawal_id: int, status: str) -> Optional[asyncpg.Record]:
+async def process_withdrawal(withdrawal_id: int, status: str, reject_reason: Optional[str] = None) -> Optional[asyncpg.Record]:
     """status: 'paid' or 'rejected'. Refunds balance on rejection."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -499,8 +502,8 @@ async def process_withdrawal(withdrawal_id: int, status: str) -> Optional[asyncp
             if not w:
                 return None
             await conn.execute(
-                "UPDATE withdrawals SET status=$2, processed_at=NOW() WHERE id=$1",
-                withdrawal_id, status
+                "UPDATE withdrawals SET status=$2, processed_at=NOW(), reject_reason=$3 WHERE id=$1",
+                withdrawal_id, status, reject_reason
             )
             if status == "rejected":
                 await conn.execute(

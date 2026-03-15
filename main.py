@@ -25,8 +25,8 @@ from handlers.withdraw import (
 from handlers.admin import (
     cmd_admin, admin_callback, cancel, edit_setting_value,
     add_task_title, add_task_chat, add_task_link,
-    broadcast_text,
-    ADD_TASK_TITLE, ADD_TASK_CHAT, ADD_TASK_LINK, BROADCAST_TEXT, EDIT_SETTING
+    broadcast_text, wreject_reason_text,
+    ADD_TASK_TITLE, ADD_TASK_CHAT, ADD_TASK_LINK, BROADCAST_TEXT, EDIT_SETTING, WREJECT_REASON
 )
 
 logging.basicConfig(
@@ -169,6 +169,7 @@ def main():
             ADD_TASK_LINK:  [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_link)],
             BROADCAST_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_text)],
             EDIT_SETTING:   [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_setting_value)],
+            WREJECT_REASON: [MessageHandler(filters.TEXT & ~filters.COMMAND, wreject_reason_text)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         per_message=False,

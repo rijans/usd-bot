@@ -113,7 +113,7 @@ async def _send_home(update: Update, record, is_new=False):
             f"• Earn {fmt_balance(ref_amount)} per referral (after they finish tasks)\n"
             f"• Claim {fmt_balance(daily_amount)} daily bonus for free\n"
             f"• Climb the leaderboard for weekly prizes\n\n"
-            f"💸 *Withdraw via:* TON · PayPal · Mobile · PUBG UC"
+            f"💸 *Withdraw via:* TON · USDT · Telegram Stars · PayPal"
         )
 
     # Send with BOTH the inline nav keyboard (on the message) AND
@@ -159,7 +159,8 @@ async def _edit_home(query, record):
             f"• {fmt_balance(task_amount)} per task completed\n"
             f"• {fmt_balance(ref_amount)} per referral (after they finish tasks)\n"
             f"• {fmt_balance(daily_amount)} daily bonus\n"
-            f"• Weekly leaderboard prizes"
+            f"• Weekly leaderboard prizes\n\n"
+            f"💸 *Withdraw via:* TON · USDT · Telegram Stars · PayPal"
         )
 
     try:
