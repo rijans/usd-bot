@@ -56,6 +56,7 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
             name = (u["full_name"] or "User")[:20]
             text += f"{medal} {name} — *{u['total_invites']} invites*\n"
 
+        buttons = []
         if daily_available:
             buttons.append([InlineKeyboardButton("🎁 Claim Daily Bonus", callback_data="earnings:daily")])
         buttons.append([InlineKeyboardButton("🏆 Full Leaderboard", callback_data="earnings:leaderboard")])
