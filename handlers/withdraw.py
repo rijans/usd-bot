@@ -16,9 +16,9 @@ Uses ConversationHandler states:
 import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
-
 import core.db as db
 from core.ui import nav_keyboard, fmt_balance
+from handlers.admin import admin_ids
 
 # ConversationHandler states
 PICK_METHOD = 1
@@ -51,7 +51,8 @@ async def nav_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         send_fn = lambda t, **kw: update.message.reply_text(t, **kw)
 
-    can, reason = await db.can_withdraw(user_id)
+    is_admin = user_id in admin_ids()
+    can, reason = await db.can_withdraw(user_id, is_admin=is_admin)
 
     if not can:
         text = _blocked_message(reason)
@@ -118,7 +119,8 @@ async def enter_destination(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ENTER_DEST  # Stay in state
 
     # Re-check eligibility (balance could change between steps)
-    can, reason = await db.can_withdraw(user_id)
+    is_admin = user_id in admin_ids()
+    can, reason = await db.can_withdraw(user_id, is_admin=is_admin)
     if not can:
         await update.message.reply_text(
             _blocked_message(reason),

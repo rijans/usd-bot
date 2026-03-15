@@ -442,8 +442,11 @@ MIN_WITHDRAW = float(os.environ.get("MIN_WITHDRAW", "20.0"))
 WITHDRAW_COOLDOWN_DAYS = 15
 
 
-async def can_withdraw(user_id: int) -> tuple[bool, str]:
+async def can_withdraw(user_id: int, is_admin: bool = False) -> tuple[bool, str]:
     """Returns (can_withdraw, reason_if_not)."""
+    if is_admin:
+        return True, "ok"
+
     from datetime import datetime, timezone, timedelta
     pool = await get_pool()
     async with pool.acquire() as conn:
