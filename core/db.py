@@ -74,13 +74,25 @@ CREATE TABLE IF NOT EXISTS withdrawals (
     requested_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     processed_at    TIMESTAMPTZ
 );
-"""
 
+CREATE TABLE IF NOT EXISTS settings (
+    key             TEXT        PRIMARY KEY,
+    value           TEXT        NOT NULL
+);
+"""
 
 async def init_schema():
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute(SCHEMA)
+        
+        # Insert defaults if empty
+        await conn.execute(
+            """INSERT INTO settings (key, value)
+               VALUES ('daily_bonus', '0.50'),
+                      ('referral_reward', '0.40')
+               ON CONFLICT (key) DO NOTHING"""
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -159,22 +171,42 @@ async def get_weekly_invite_rank(user_id: int) -> int:
         return row["rank"]
 
 
-async def claim_daily_bonus(user_id: int, amount: float = 0.50) -> tuple[bool, str]:
-    """Returns (success, reason). reason: 'ok' | 'already_claimed'"""
+async def get_setting(key: str, default: str) -> str:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        val = await conn.fetchval("SELECT value FROM settings WHERE key=$1", key)
+        return val if val else default
+
+
+async def set_setting(key: str, value: str):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value=$2",
+            key, value
+        )
+
+
+async def claim_daily_bonus(user_id: int) -> tuple[bool, str, float]:
+    """Returns (success, reason, amount_credited)"""
     from datetime import date
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT last_daily, tasks_done FROM users WHERE user_id=$1", user_id)
         if not row or not row["tasks_done"]:
-            return False, "tasks_incomplete"
+            return False, "tasks_incomplete", 0.0
         today = date.today()
         if row["last_daily"] and row["last_daily"] >= today:
-            return False, "already_claimed"
+            return False, "already_claimed", 0.0
+            
+        amt_str = await conn.fetchval("SELECT value FROM settings WHERE key='daily_bonus'")
+        amount = float(amt_str) if amt_str else 0.50
+        
         await conn.execute(
             "UPDATE users SET balance=balance+$2, last_daily=$3 WHERE user_id=$1",
             user_id, amount, today
         )
-        return True, "ok"
+        return True, "ok", amount
 
 
 async def get_all_user_ids() -> list[int]:
@@ -205,6 +237,15 @@ async def get_leaderboard(limit: int = 20) -> list[asyncpg.Record]:
         return await conn.fetch(
             "SELECT user_id, full_name, total_invites, balance "
             "FROM users ORDER BY total_invites DESC LIMIT $1",
+            limit
+        )
+
+async def get_earners_leaderboard(limit: int = 10) -> list[asyncpg.Record]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetch(
+            "SELECT user_id, full_name, total_invites, balance "
+            "FROM users ORDER BY balance DESC LIMIT $1",
             limit
         )
 
@@ -282,14 +323,16 @@ async def check_and_finalize_tasks(user_id: int) -> bool:
         # All tasks done — unlock user
         await conn.execute("UPDATE users SET tasks_done=TRUE WHERE user_id=$1", user_id)
 
-        # Credit referrer $0.4
+        # Credit referrer
         if user["referred_by"]:
             referrer_id = user["referred_by"]
             ref = await conn.fetchrow("SELECT tasks_done FROM users WHERE user_id=$1", referrer_id)
             if ref:
+                amt_str = await conn.fetchval("SELECT value FROM settings WHERE key='referral_reward'")
+                ref_amt = float(amt_str) if amt_str else 0.40
                 await conn.execute(
-                    "UPDATE users SET balance=balance+0.4, total_invites=total_invites+1 WHERE user_id=$1",
-                    referrer_id
+                    "UPDATE users SET balance=balance+$2, total_invites=total_invites+1 WHERE user_id=$1",
+                    referrer_id, ref_amt
                 )
 
         return True
@@ -317,8 +360,10 @@ async def toggle_task(task_id: int) -> Optional[asyncpg.Record]:
 async def delete_task(task_id: int) -> bool:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        result = await conn.execute("DELETE FROM tasks WHERE id=$1", task_id)
-        return result == "DELETE 1"
+        async with conn.transaction():
+            await conn.execute("DELETE FROM task_completions WHERE task_id=$1", task_id)
+            result = await conn.execute("DELETE FROM tasks WHERE id=$1", task_id)
+            return result == "DELETE 1"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

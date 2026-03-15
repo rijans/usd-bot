@@ -14,12 +14,16 @@ MEDALS = ["🥇", "🥈", "🥉"]
 
 async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
+    user_id = update.effective_user.id
+    
+    if query:
+        await query.answer()
 
     user = await db.get_user(user_id)
     if not user:
-        await query.answer("Please /start first.", show_alert=True)
+        msg = "Please /start first."
+        if query: await query.answer(msg, show_alert=True)
+        else: await update.message.reply_text(msg)
         return
 
     rank = await db.get_rank(user_id)
@@ -57,13 +61,12 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
             buttons.append([InlineKeyboardButton("🎁 Claim Daily Bonus", callback_data="earnings:daily")])
         buttons.append([InlineKeyboardButton("🏆 Full Leaderboard", callback_data="earnings:leaderboard")])
 
-    await query.edit_message_text(
-        text,
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(buttons + [[
-            InlineKeyboardButton("🏠 Home", callback_data="nav:start")
-        ]]),
-    )
+    reply_markup = InlineKeyboardMarkup(buttons + [[InlineKeyboardButton("🏠 Home", callback_data="nav:start")]])
+
+    if query:
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
 
 
 async def claim_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):

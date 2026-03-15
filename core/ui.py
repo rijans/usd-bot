@@ -2,9 +2,12 @@
 core/ui.py  ─  Shared keyboards, text helpers, membership verification.
 """
 import os
+import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest, Forbidden
 import asyncpg
+
+log = logging.getLogger(__name__)
 
 BOT_USERNAME = os.environ.get("BOT_USERNAME", "Dollar_Earning_Crypto_Bot")
 BOT_NAME     = os.environ.get("BOT_NAME",     "Dollar Earning Crypto Bot")
@@ -72,8 +75,9 @@ async def is_member(bot, user_id: int, chat_id: str) -> bool:
     try:
         member = await bot.get_chat_member(chat_id, user_id)
         return member.status not in ("left", "kicked", "banned")
-    except (BadRequest, Forbidden):
-        return False
+    except (BadRequest, Forbidden) as e:
+        log.warning(f"Failed to check membership for {user_id} in {chat_id}: {e}. Granting access.")
+        return True
 
 
 async def check_all_tasks(bot, user_id: int, tasks: list) -> dict[int, bool]:

@@ -27,6 +27,7 @@ ADD_TASK_TITLE = 20
 ADD_TASK_CHAT  = 21
 ADD_TASK_LINK  = 22
 BROADCAST_TEXT = 30
+EDIT_SETTING   = 40
 
 
 def admin_ids() -> list[int]:
@@ -72,6 +73,7 @@ def _admin_keyboard():
         [InlineKeyboardButton("📋 Manage Tasks", callback_data="adm:tasks")],
         [InlineKeyboardButton("💸 Withdrawals", callback_data="adm:withdrawals")],
         [InlineKeyboardButton("📢 Broadcast", callback_data="adm:broadcast")],
+        [InlineKeyboardButton("⚙️ Settings", callback_data="adm:settings")],
         [InlineKeyboardButton("📊 Full Stats", callback_data="adm:stats")],
     ])
 
@@ -195,25 +197,63 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return BROADCAST_TEXT
 
-    # ── Stats ─────────────────────────────────────────────────────────────────
+    # ── Full Stats ────────────────────────────────────────────────────────────
     elif data == "adm:stats":
         stats = await db.get_stats()
-        top = await db.get_leaderboard(5)
+        top_inviters = await db.get_leaderboard(10)
+        top_earners = await db.get_earners_leaderboard(10)
+        
         text = (
             f"📊 *Full Statistics*\n\n"
             f"👥 Total Users: {stats['total_users']}\n"
             f"✅ Active (tasks done): {stats['active_users']}\n"
             f"💰 Total Balance Owed: {fmt_balance(stats['total_balance_owed'])}\n"
             f"💸 Pending Withdrawals: {stats['pending_withdrawals']}\n\n"
-            f"🏆 *Top 5 Inviters:*\n"
+            f"🏆 *Top 10 Inviters:*\n"
         )
-        for i, u in enumerate(top, 1):
+        for i, u in enumerate(top_inviters, 1):
             text += f"{i}. {u['full_name']} — {u['total_invites']} invites\n"
+            
+        text += f"\n💰 *Top 10 Earners:*\n"
+        for i, u in enumerate(top_earners, 1):
+            text += f"{i}. {u['full_name']} — {fmt_balance(u['balance'])}\n"
+            
         await query.edit_message_text(
             text, parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="adm:back")]])
         )
         return ConversationHandler.END
+
+    # ── Settings ──────────────────────────────────────────────────────────────
+    elif data == "adm:settings":
+        daily = await db.get_setting("daily_bonus", "0.50")
+        ref = await db.get_setting("referral_reward", "0.40")
+        text = (
+            f"⚙️ *Bot Settings*\n\n"
+            f"🎁 Daily Bonus: `{fmt_balance(daily)}`\n"
+            f"👥 Referral Reward: `{fmt_balance(ref)}`\n\n"
+            f"Choose a setting to edit:"
+        )
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎁 Edit Daily Bonus", callback_data="adm:edit_set:daily_bonus")],
+            [InlineKeyboardButton("👥 Edit Referral Reward", callback_data="adm:edit_set:referral_reward")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="adm:back")]
+        ])
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+        return ConversationHandler.END
+
+    elif data.startswith("adm:edit_set:"):
+        key = data.split(":")[2]
+        context.user_data["edit_setting_key"] = key
+        
+        labels = {"daily_bonus": "Daily Bonus", "referral_reward": "Referral Reward"}
+        await query.edit_message_text(
+            f"⚙️ *Edit {labels.get(key, key)}*\n\n"
+            f"Send the new amount in dollars (e.g. `0.25` or `1.50`).\n\n"
+            f"_(Type /cancel to abort)_",
+            parse_mode="Markdown"
+        )
+        return EDIT_SETTING
 
     # ── Back ──────────────────────────────────────────────────────────────────
     elif data == "adm:back":
@@ -334,6 +374,28 @@ async def broadcast_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ConversationHandler.END
 
+
+@require_admin
+async def edit_setting_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    val_str = update.message.text.strip()
+    try:
+        val = float(val_str)
+        if val < 0:
+            raise ValueError
+    except ValueError:
+        await update.message.reply_text("⚠️ Invalid amount. Must be a positive number like `0.50`. Try again:", parse_mode="Markdown")
+        return EDIT_SETTING
+
+    key = context.user_data.pop("edit_setting_key", None)
+    if key:
+        await db.set_setting(key, str(val))
+    
+    await update.message.reply_text(
+        f"✅ *Setting Updated!*\n\nNew value: `{fmt_balance(val)}`",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back to Settings", callback_data="adm:settings")]])
+    )
+    return ConversationHandler.END
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers

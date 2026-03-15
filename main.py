@@ -23,10 +23,10 @@ from handlers.withdraw import (
     PICK_METHOD, ENTER_DEST,
 )
 from handlers.admin import (
-    cmd_admin, admin_callback, cancel,
+    cmd_admin, admin_callback, cancel, edit_setting_value,
     add_task_title, add_task_chat, add_task_link,
     broadcast_text,
-    ADD_TASK_TITLE, ADD_TASK_CHAT, ADD_TASK_LINK, BROADCAST_TEXT,
+    ADD_TASK_TITLE, ADD_TASK_CHAT, ADD_TASK_LINK, BROADCAST_TEXT, EDIT_SETTING
 )
 
 logging.basicConfig(
@@ -45,7 +45,21 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     err = context.error
     if isinstance(err, BadRequest) and "Message is not modified" in str(err):
         return
+    
     log.error("Unhandled exception", exc_info=err)
+    
+    # Notify admins
+    import traceback
+    admin_ids = os.environ.get("ADMIN_IDS", "")
+    if admin_ids:
+        admins = [int(x.strip()) for x in admin_ids.split(",") if x.strip().isdigit()]
+        tb_str = "".join(traceback.format_exception(None, err, err.__traceback__))
+        err_msg = f"❌ *Unhandled Exception*\n\n`{tb_str[-1000:]}`" # Sent last 1000 chars of traceback
+        for admin_id in admins:
+            try:
+                await context.bot.send_message(admin_id, err_msg, parse_mode="Markdown")
+            except Exception:
+                pass
 
 
 # ── Slash command shortcuts ───────────────────────────────────────────────────
@@ -87,23 +101,18 @@ async def cmd_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def reply_kb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    routes = {
-        "📋 Tasks":    ("📋 *Tasks*",    "nav:tasks",    "📋 Open Tasks"),
-        "💰 Earnings": ("💰 *Earnings*", "nav:earnings", "💰 Open Earnings"),
-        "📤 Share":    ("📤 *Share*",    "nav:share",    "📤 Open Share"),
-        "👥 Refer":    ("👥 *Refer*",    "nav:refer",    "👥 Open Refer"),
-    }
-
     if text == "🏠 Home":
         await nav_start(update, context)
+    elif text == "📋 Tasks":
+        await nav_tasks(update, context)
+    elif text == "💰 Earnings":
+        await nav_earnings(update, context)
+    elif text == "📤 Share":
+        await nav_share(update, context)
+    elif text == "👥 Refer":
+        await nav_refer(update, context)
     elif text == "💸 Withdraw":
         await nav_withdraw(update, context)
-    elif text in routes:
-        label, callback, btn_text = routes[text]
-        await update.message.reply_text(
-            label, parse_mode="Markdown",
-            reply_markup=_open_button(btn_text, callback)
-        )
 
 
 def main():
@@ -170,6 +179,7 @@ def main():
             ADD_TASK_CHAT:  [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_chat)],
             ADD_TASK_LINK:  [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_link)],
             BROADCAST_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_text)],
+            EDIT_SETTING:   [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_setting_value)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         per_message=False,

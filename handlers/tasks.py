@@ -16,12 +16,18 @@ from core.ui import nav_keyboard, check_all_tasks, progress_bar, fmt_balance
 
 async def nav_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
-    await _render_task_list(query, context)
+    if query:
+        await query.answer()
+        await _render_task_list(query, update.effective_user.id, context)
+    else:
+        # User tap the reply keyboard button
+        import logging
+        log = logging.getLogger(__name__)
+        log.info(f"User {update.effective_user.id} requested nav_tasks via reply keyboard")
+        await _render_task_list_from_msg(update.message, update.effective_user.id, context)
 
 
-async def _render_task_list(query, context):
-    user_id = query.from_user.id
+async def _render_task_list(query, user_id, context):
     tasks = await db.get_active_tasks()
 
     if not tasks:
@@ -62,6 +68,54 @@ async def _render_task_list(query, context):
 
     buttons.append([InlineKeyboardButton("🔄 Refresh Status", callback_data="nav:tasks")])
     await query.edit_message_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(buttons + [[
+            InlineKeyboardButton("🏠 Home", callback_data="nav:start")
+        ]]),
+    )
+
+async def _render_task_list_from_msg(message, user_id, context):
+    tasks = await db.get_active_tasks()
+
+    if not tasks:
+        await message.reply_text(
+            "📋 *Tasks*\n\nNo tasks available right now. Check back later!",
+            parse_mode="Markdown",
+            reply_markup=nav_keyboard(),
+        )
+        return
+
+    completed_ids = await db.get_completed_task_ids(user_id)
+    # Live-check membership for incomplete tasks only
+    incomplete_tasks = [t for t in tasks if t["id"] not in completed_ids]
+    live_status = await check_all_tasks(context.bot, user_id, incomplete_tasks)
+
+    done = len(completed_ids)
+    total = len(tasks)
+    bar = progress_bar(done, total)
+
+    text = (
+        f"📋 *Tasks*  ({done}/{total} completed)\n"
+        f"`{bar}`\n\n"
+        f"Join the channels/groups below to unlock the bot and earn rewards!\n\n"
+    )
+
+    buttons = []
+    for i, task in enumerate(tasks, 1):
+        if task["id"] in completed_ids:
+            status_icon = "✅"
+        elif live_status.get(task["id"]):
+            status_icon = "🔄"  # joined but not marked yet
+        else:
+            status_icon = "❌"
+
+        reward_label = f" (+{fmt_balance(task['reward'])})" if float(task["reward"]) > 0 else ""
+        label = f"{status_icon} {i}. {task['title']}{reward_label}"
+        buttons.append([InlineKeyboardButton(label, callback_data=f"task:view:{task['id']}")])
+
+    buttons.append([InlineKeyboardButton("🔄 Refresh Status", callback_data="nav:tasks")])
+    await message.reply_text(
         text,
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(buttons + [[
@@ -134,7 +188,7 @@ async def task_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
     completed_ids = await db.get_completed_task_ids(user_id)
     if task_id in completed_ids:
         await query.answer("Already completed!", show_alert=True)
-        await _render_task_list(query, context)
+        await _render_task_list(query, user_id, context)
         return
 
     # Live membership check

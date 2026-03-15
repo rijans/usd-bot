@@ -13,60 +13,23 @@ from core.ui import nav_keyboard, invite_link as build_invite, fmt_balance, BOT_
 
 
 async def nav_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await _render_share(query)
-
+    await _render_refer(update, context)
 
 async def nav_refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await _render_refer(update, context)
+
+
+async def _render_refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
-    await _render_refer(query)
-
-
-async def _render_share(query):
-    user_id = query.from_user.id
-    link = build_invite(user_id)
-
-    text = (
-        f"📤 *Share & Earn*\n\n"
-        f"🔗 Your invite link:\n"
-        f"`{link}`\n\n"
-        f"Share this link with friends.\n"
-        f"When they join and complete all tasks, you earn *$0.40* automatically!\n\n"
-        f"💡 *Tips:*\n"
-        f"• Share in groups and channels\n"
-        f"• Post on social media\n"
-        f"• The more you share, the more you earn!"
-    )
-
-    share_text = (
-        f"💰 Join {BOT_NAME} and earn money easily!\n\n"
-        f"✦ Earn $0.40 per referral\n"
-        f"✦ $0.50 free daily bonus\n"
-        f"✦ Weekly prizes for top inviters\n\n"
-        f"👉 {link}"
-    )
-
-    await query.edit_message_text(
-        text,
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton(
-                "📤 Share Link",
-                switch_inline_query=share_text
-            )],
-            [InlineKeyboardButton("👥 View Referral Stats", callback_data="nav:refer")],
-            [InlineKeyboardButton("🏠 Home", callback_data="nav:start")],
-        ]),
-    )
-
-
-async def _render_refer(query):
-    user_id = query.from_user.id
+    user_id = update.effective_user.id
+    if query:
+        await query.answer()
+        
     user = await db.get_user(user_id)
     if not user:
-        await query.answer("Please /start first.", show_alert=True)
+        msg = "Please /start first."
+        if query: await query.answer(msg, show_alert=True)
+        else: await update.message.reply_text(msg)
         return
 
     link = build_invite(user_id)
@@ -74,18 +37,14 @@ async def _render_refer(query):
     top = await db.get_leaderboard(3)
 
     text = (
-        f"👥 *Referral Program*\n\n"
+        f"👥 *Refer & Earn*\n\n"
         f"🔗 Your invite link:\n"
         f"`{link}`\n\n"
+        f"💡 Share this link with friends! When they join and complete all tasks, you earn *$0.40* automatically.\n\n"
         f"📊 *Your Stats:*\n"
         f"✅ Total Invites: *{user['total_invites']}*\n"
         f"💰 Balance: *{fmt_balance(user['balance'])}*\n"
         f"🏆 Weekly Rank: *#{weekly_rank}*\n\n"
-        f"💡 Earn *$0.40* for every friend who joins and completes tasks.\n\n"
-        f"🏆 *Weekly Prizes:*\n"
-        f"🥇 1st–3rd: $10 each\n"
-        f"🥈 4th–10th: $5 each\n"
-        f"🥉 11th–20th: $3 each\n\n"
         f"🔥 *Top 3 This Week:*\n"
     )
     for i, u in enumerate(top, 1):
@@ -98,12 +57,13 @@ async def _render_refer(query):
         f"👉 {link}"
     )
 
-    await query.edit_message_text(
-        text,
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📤 Share Link", switch_inline_query=share_text)],
-            [InlineKeyboardButton("🏆 Leaderboard", callback_data="earnings:leaderboard")],
-            [InlineKeyboardButton("🏠 Home", callback_data="nav:start")],
-        ]),
-    )
+    markup = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📤 Share Link", switch_inline_query=share_text)],
+        [InlineKeyboardButton("🏆 Leaderboard", callback_data="earnings:leaderboard")],
+        [InlineKeyboardButton("🏠 Home", callback_data="nav:start")],
+    ])
+
+    if query:
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=markup)
+    else:
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=markup)
