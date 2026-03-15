@@ -62,7 +62,7 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if daily_available:
             buttons.append([InlineKeyboardButton("🎁 Claim Daily Bonus", callback_data="earnings:daily")])
         buttons.append([InlineKeyboardButton("🏆 Full Leaderboard", callback_data="earnings:leaderboard")])
-        buttons.append([InlineKeyboardButton("📜 History", callback_data="earnings:history")])
+        buttons.append([InlineKeyboardButton("📜 Full History", callback_data="earnings:history")])
 
     reply_markup = InlineKeyboardMarkup(buttons + [[InlineKeyboardButton("🏠 Home", callback_data="nav:start")]])
 
