@@ -70,28 +70,16 @@ def _open_button(label: str, callback: str) -> InlineKeyboardMarkup:
 
 
 async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📋 *Tasks*", parse_mode="Markdown",
-        reply_markup=_open_button("📋 Open Tasks", "nav:tasks")
-    )
+    await nav_tasks(update, context)
 
 async def cmd_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "💰 *Earnings*", parse_mode="Markdown",
-        reply_markup=_open_button("💰 Open Earnings", "nav:earnings")
-    )
+    await nav_earnings(update, context)
 
 async def cmd_refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👥 *Refer*", parse_mode="Markdown",
-        reply_markup=_open_button("👥 Open Refer", "nav:refer")
-    )
+    await nav_refer(update, context)
 
 async def cmd_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "📤 *Share*", parse_mode="Markdown",
-        reply_markup=_open_button("📤 Open Share", "nav:share")
-    )
+    await nav_share(update, context)
 
 
 # ── Reply keyboard button handler ────────────────────────────────────────────
