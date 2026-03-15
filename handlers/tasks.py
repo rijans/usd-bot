@@ -208,8 +208,18 @@ async def task_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Mark complete
-    await db.mark_task_complete(user_id, task_id)
-    just_unlocked = await db.check_and_finalize_tasks(user_id)
+    is_newly_done, task_reward = await db.mark_task_complete(user_id, task_id)
+    if is_newly_done and task_reward > 0:
+        try:
+            await context.bot.send_message(
+                user_id,
+                f"🎉 You received *{fmt_balance(task_reward)}* for completing *{task['title']}*!",
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
+
+    just_unlocked, ref_amt = await db.check_and_finalize_tasks(user_id)
 
     user = await db.get_user(user_id)
     tasks = await db.get_active_tasks()
@@ -219,24 +229,27 @@ async def task_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if just_unlocked:
         # Notify referrer
-        if user["referred_by"]:
+        if user["referred_by"] and ref_amt > 0:
             try:
                 await context.bot.send_message(
                     user["referred_by"],
                     f"🎉 *Referral Reward!*\n\n"
                     f"Your referral *{user['full_name']}* completed all tasks!\n"
-                    f"💰 *+$0.40* has been added to your balance.",
+                    f"💰 *+{fmt_balance(ref_amt)}* has been added to your balance.",
                     parse_mode="Markdown",
                 )
             except Exception:
                 pass
 
+        daily_amount = await db.get_setting("daily_bonus", "0.50")
+        ref_amount = await db.get_setting("referral_reward", "0.40")
+
         text = (
             f"🎉 *All Tasks Completed!*\n\n"
             f"✦ You've unlocked all bot features!\n\n"
             f"What you can now do:\n"
-            f"• 💰 Earn $0.40 per referral\n"
-            f"• 🎁 Claim $0.50 daily bonus\n"
+            f"• 💰 Earn {fmt_balance(ref_amount)} per referral\n"
+            f"• 🎁 Claim {fmt_balance(daily_amount)} daily bonus\n"
             f"• 💸 Withdraw at $20.00 minimum\n\n"
             f"Start by sharing your referral link!"
         )

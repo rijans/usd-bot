@@ -36,12 +36,21 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             pass
 
-    record, is_new = await db.upsert_user(
+    record, is_new, signup_amt = await db.upsert_user(
         user_id=user.id,
         username=user.username or "",
         full_name=user.full_name,
         referred_by=referred_by,
     )
+
+    if is_new and signup_amt > 0:
+        try:
+            await update.message.reply_text(
+                f"🎉 *Welcome Bonus!* You received *{fmt_balance(signup_amt)}* just for joining!",
+                parse_mode="Markdown"
+            )
+        except Exception:
+            pass
 
     await _send_home(update, record, is_new=is_new)
 
@@ -54,7 +63,7 @@ async def nav_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         record = await db.get_user(query.from_user.id)
         if not record:
-            record, _ = await db.upsert_user(
+            record, _, _ = await db.upsert_user(
                 query.from_user.id, query.from_user.username or "", query.from_user.full_name
             )
         await _edit_home(query, record)
@@ -62,7 +71,7 @@ async def nav_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Triggered by reply keyboard "🏠 Home" button
         record = await db.get_user(update.effective_user.id)
         if not record:
-            record, _ = await db.upsert_user(
+            record, _, _ = await db.upsert_user(
                 update.effective_user.id,
                 update.effective_user.username or "",
                 update.effective_user.full_name,
@@ -90,12 +99,19 @@ async def _send_home(update: Update, record, is_new=False):
             f"👉 Tap *Tasks* below to get started."
         )
     else:
+        daily_amount = await db.get_setting("daily_bonus", "0.50")
+        ref_amount = await db.get_setting("referral_reward", "0.40")
+        signup_amount = await db.get_setting("signup_bonus", "1.00")
+        task_amount = await db.get_setting("task_reward", "0.50")
+        
         text += (
             f"💰 Balance: *{fmt_balance(record['balance'])}*\n"
             f"👥 Total Invites: *{record['total_invites']}*\n\n"
             f"📖 *How to earn:*\n"
-            f"• Earn $0.40 per referral (after they finish tasks)\n"
-            f"• Claim $0.50 daily bonus for free\n"
+            f"• Get {fmt_balance(signup_amount)} simply for joining\n"
+            f"• Earn {fmt_balance(task_amount)} for every task you complete\n"
+            f"• Earn {fmt_balance(ref_amount)} per referral (after they finish tasks)\n"
+            f"• Claim {fmt_balance(daily_amount)} daily bonus for free\n"
             f"• Climb the leaderboard for weekly prizes\n\n"
             f"💸 *Withdraw via:* TON · PayPal · Mobile · PUBG UC"
         )
@@ -130,12 +146,19 @@ async def _edit_home(query, record):
             f"👉 Tap *Tasks* to continue."
         )
     else:
+        daily_amount = await db.get_setting("daily_bonus", "0.50")
+        ref_amount = await db.get_setting("referral_reward", "0.40")
+        signup_amount = await db.get_setting("signup_bonus", "1.00")
+        task_amount = await db.get_setting("task_reward", "0.50")
+        
         text += (
             f"💰 Balance: *{fmt_balance(record['balance'])}*\n"
             f"👥 Total Invites: *{record['total_invites']}*\n\n"
             f"📖 *How to earn:*\n"
-            f"• $0.40 per referral (after they finish tasks)\n"
-            f"• $0.50 daily bonus\n"
+            f"• {fmt_balance(signup_amount)} welcome bonus\n"
+            f"• {fmt_balance(task_amount)} per task completed\n"
+            f"• {fmt_balance(ref_amount)} per referral (after they finish tasks)\n"
+            f"• {fmt_balance(daily_amount)} daily bonus\n"
             f"• Weekly leaderboard prizes"
         )
 

@@ -24,40 +24,10 @@ usd-bot/
 ## Known Bugs / TODO
 
 ### High Priority
-- [ ] Reply keyboard buttons (Tasks, Earnings, Share, Refer) open a
-      middle-step message instead of directly rendering content.
-      FIX: Each nav handler needs to accept both `update.callback_query`
-      AND plain `update.message` — check which one is present and branch.
-
-- [ ] Bot must be admin in a channel to verify membership via
-      `get_chat_member()`. If bot is not admin, verification silently
-      fails (returns False). Should detect this case and show a warning
-      or skip verification gracefully.
-      FIX: In `core/ui.py:is_member()`, first check bot's own status
-      in the chat before checking the user's status.
 
 ### Medium Priority
-- [ ] Reward amounts ($0.40 referral, $0.50 daily) are hardcoded.
-      Should be configurable from admin panel without redeploying.
-      FIX: Add a `settings` table (key/value), read values from DB.
-
-- [ ] Full Stats in admin only shows top 5 inviters.
-      Should show top 10 inviters AND top 10 earners.
-
-- [ ] `delete_task()` in db.py doesn't clean up `task_completions` first,
-      causing a FK constraint error.
-      FIX: `DELETE FROM task_completions WHERE task_id=$1` before deleting task.
 
 ### Low Priority
-- [ ] Share and Refer are separate screens but show similar content.
-      Could be merged into one "Refer & Earn" screen.
-
-- [ ] Some inline button groups are not full-width.
-      FIX: Put each button on its own row, or use only 2 buttons per row.
-
-- [ ] No error notification to admin when unhandled exceptions occur.
-      FIX: In `error_handler` in main.py, send a DM to ADMIN_IDS with
-      the traceback.
 
 ---
 

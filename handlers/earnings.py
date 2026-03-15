@@ -56,10 +56,10 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
             name = (u["full_name"] or "User")[:20]
             text += f"{medal} {name} — *{u['total_invites']} invites*\n"
 
-        buttons = []
         if daily_available:
             buttons.append([InlineKeyboardButton("🎁 Claim Daily Bonus", callback_data="earnings:daily")])
         buttons.append([InlineKeyboardButton("🏆 Full Leaderboard", callback_data="earnings:leaderboard")])
+        buttons.append([InlineKeyboardButton("📜 History", callback_data="earnings:history")])
 
     reply_markup = InlineKeyboardMarkup(buttons + [[InlineKeyboardButton("🏠 Home", callback_data="nav:start")]])
 
@@ -127,6 +127,53 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🥈 4th–10th: $5 each\n"
         f"🥉 11th–20th: $3 each"
     )
+
+    await query.edit_message_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ Back to Earnings", callback_data="nav:earnings")]
+        ]),
+    )
+
+
+def _mask_id(id_str: str) -> str:
+    if not id_str:
+        return ""
+    if len(id_str) <= 4:
+        return "***"
+    return f"{id_str[:3]}***{id_str[-3:]}"
+
+
+async def nav_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    
+    history = await db.get_user_history(user_id, limit=15)
+    
+    if not history:
+        text = "📜 *Earning History*\n\nNo transactions found."
+    else:
+        text = "📜 *Recent Earnings*\n\n"
+        for row in history:
+            date_str = row['created_at'].strftime('%m/%d')
+            amount = fmt_balance(row['amount'])
+            t_type = row['type']
+            
+            if t_type == 'signup':
+                desc = "Signup Bonus"
+            elif t_type == 'task':
+                desc = f"Task completed (ID: {row['related_to']})"
+            elif t_type == 'referral':
+                masked = _mask_id(row['related_to'])
+                desc = f"Referral reward (User: `{masked}`)"
+            elif t_type == 'daily_bonus':
+                desc = "Daily Bonus"
+            else:
+                desc = t_type
+                
+            text += f"• *{date_str}* | +{amount} | {desc}\n"
 
     await query.edit_message_text(
         text,

@@ -16,7 +16,7 @@ from telegram.ext import (
 import core.db as db
 from handlers.start    import cmd_start, nav_start
 from handlers.tasks    import nav_tasks, task_view, task_verify
-from handlers.earnings import nav_earnings, claim_daily, show_leaderboard
+from handlers.earnings import nav_earnings, claim_daily, show_leaderboard, nav_history
 from handlers.referral import nav_share, nav_refer
 from handlers.withdraw import (
     nav_withdraw, pick_method, enter_destination, cancel_withdraw,
@@ -137,6 +137,7 @@ def main():
     # ── Earnings callbacks ────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(claim_daily,      pattern="^earnings:daily$"))
     app.add_handler(CallbackQueryHandler(show_leaderboard, pattern="^earnings:leaderboard$"))
+    app.add_handler(CallbackQueryHandler(nav_history,      pattern="^earnings:history$"))
 
     # ── Withdraw ConversationHandler ──────────────────────────────────────────
     withdraw_conv = ConversationHandler(

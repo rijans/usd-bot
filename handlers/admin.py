@@ -228,15 +228,22 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "adm:settings":
         daily = await db.get_setting("daily_bonus", "0.50")
         ref = await db.get_setting("referral_reward", "0.40")
+        signup = await db.get_setting("signup_bonus", "1.00")
+        task = await db.get_setting("task_reward", "0.50")
+        
         text = (
             f"⚙️ *Bot Settings*\n\n"
             f"🎁 Daily Bonus: `{fmt_balance(daily)}`\n"
-            f"👥 Referral Reward: `{fmt_balance(ref)}`\n\n"
+            f"👥 Referral Reward: `{fmt_balance(ref)}`\n"
+            f"🎉 Signup Bonus: `{fmt_balance(signup)}`\n"
+            f"📋 Task Reward: `{fmt_balance(task)}`\n\n"
             f"Choose a setting to edit:"
         )
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🎁 Edit Daily Bonus", callback_data="adm:edit_set:daily_bonus")],
             [InlineKeyboardButton("👥 Edit Referral Reward", callback_data="adm:edit_set:referral_reward")],
+            [InlineKeyboardButton("🎉 Edit Signup Bonus", callback_data="adm:edit_set:signup_bonus")],
+            [InlineKeyboardButton("📋 Edit Task Reward", callback_data="adm:edit_set:task_reward")],
             [InlineKeyboardButton("⬅️ Back", callback_data="adm:back")]
         ])
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -246,7 +253,12 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         key = data.split(":")[2]
         context.user_data["edit_setting_key"] = key
         
-        labels = {"daily_bonus": "Daily Bonus", "referral_reward": "Referral Reward"}
+        labels = {
+            "daily_bonus": "Daily Bonus", 
+            "referral_reward": "Referral Reward",
+            "signup_bonus": "Signup Bonus",
+            "task_reward": "Task Reward"
+        }
         await query.edit_message_text(
             f"⚙️ *Edit {labels.get(key, key)}*\n\n"
             f"Send the new amount in dollars (e.g. `0.25` or `1.50`).\n\n"
