@@ -101,10 +101,14 @@ async def init_schema():
         # Insert defaults if empty
         await conn.execute(
             """INSERT INTO settings (key, value)
-               VALUES ('daily_bonus', '0.50'),
-                      ('referral_reward', '0.40'),
-                      ('signup_bonus', '1.00'),
-                      ('task_reward', '0.50')
+               VALUES ('signup_bonus', '1.00'),
+                      ('task_reward', '0.30'),
+                      ('daily_bonus_primary', '0.20'),
+                      ('daily_bonus_secondary', '0.02'),
+                      ('daily_bonus_threshold', '5'),
+                      ('referral_reward_primary', '0.30'),
+                      ('referral_reward_secondary', '0.05'),
+                      ('referral_reward_threshold', '5')
                ON CONFLICT (key) DO NOTHING"""
         )
 
@@ -215,7 +219,7 @@ async def set_setting(key: str, value: str):
 
 
 async def claim_daily_bonus(user_id: int) -> tuple[bool, str, float]:
-    """Returns (success, reason, amount_credited)"""
+    """Returns (success, reason, amount_credited). Uses tiered daily bonus."""
     from datetime import date
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -225,10 +229,18 @@ async def claim_daily_bonus(user_id: int) -> tuple[bool, str, float]:
         today = date.today()
         if row["last_daily"] and row["last_daily"] >= today:
             return False, "already_claimed", 0.0
-            
-        amt_str = await conn.fetchval("SELECT value FROM settings WHERE key='daily_bonus'")
-        amount = float(amt_str) if amt_str else 0.50
-        
+
+        # Count previous daily claims for tiered logic
+        past_claims = await conn.fetchval(
+            "SELECT COUNT(*) FROM transactions WHERE user_id=$1 AND type='daily_bonus'",
+            user_id
+        )
+        threshold = int(await get_setting("daily_bonus_threshold", "5"))
+        if past_claims < threshold:
+            amount = float(await get_setting("daily_bonus_primary", "0.20"))
+        else:
+            amount = float(await get_setting("daily_bonus_secondary", "0.02"))
+
         async with conn.transaction():
             await conn.execute(
                 "UPDATE users SET balance=balance+$2, last_daily=$3 WHERE user_id=$1",
@@ -386,11 +398,17 @@ async def check_and_finalize_tasks(user_id: int) -> tuple[bool, float]:
             # Credit referrer
             if user["referred_by"]:
                 referrer_id = user["referred_by"]
-                ref = await conn.fetchrow("SELECT tasks_done FROM users WHERE user_id=$1", referrer_id)
+                ref = await conn.fetchrow("SELECT tasks_done, total_invites FROM users WHERE user_id=$1", referrer_id)
                 if ref:
-                    amt_str = await conn.fetchval("SELECT value FROM settings WHERE key='referral_reward'")
-                    ref_amt = float(amt_str) if amt_str else 0.40
-                    
+                    # Tiered referral reward
+                    threshold = int(await conn.fetchval("SELECT COALESCE((SELECT value FROM settings WHERE key='referral_reward_threshold'), '5')"))
+                    if ref["total_invites"] < threshold:
+                        amt_str = await conn.fetchval("SELECT value FROM settings WHERE key='referral_reward_primary'")
+                        ref_amt = float(amt_str) if amt_str else 0.30
+                    else:
+                        amt_str = await conn.fetchval("SELECT value FROM settings WHERE key='referral_reward_secondary'")
+                        ref_amt = float(amt_str) if amt_str else 0.05
+
                     if ref_amt > 0:
                         await conn.execute(
                             "UPDATE users SET balance=balance+$2, total_invites=total_invites+1 WHERE user_id=$1",

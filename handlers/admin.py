@@ -238,24 +238,36 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Settings ──────────────────────────────────────────────────────────────
     elif data == "adm:settings":
-        daily = await db.get_setting("daily_bonus", "0.50")
-        ref = await db.get_setting("referral_reward", "0.40")
         signup = await db.get_setting("signup_bonus", "1.00")
-        task = await db.get_setting("task_reward", "0.50")
+        task = await db.get_setting("task_reward", "0.30")
+        dp = await db.get_setting("daily_bonus_primary", "0.20")
+        ds = await db.get_setting("daily_bonus_secondary", "0.02")
+        dt = await db.get_setting("daily_bonus_threshold", "5")
+        rp = await db.get_setting("referral_reward_primary", "0.30")
+        rs = await db.get_setting("referral_reward_secondary", "0.05")
+        rt = await db.get_setting("referral_reward_threshold", "5")
         
         text = (
             f"⚙️ *Bot Settings*\n\n"
-            f"🎁 Daily Bonus: `{fmt_balance(daily)}`\n"
-            f"👥 Referral Reward: `{fmt_balance(ref)}`\n"
             f"🎉 Signup Bonus: `{fmt_balance(signup)}`\n"
             f"📋 Task Reward: `{fmt_balance(task)}`\n\n"
+            f"🎁 *Daily Bonus (Tiered):*\n"
+            f"  First {dt} days: `{fmt_balance(dp)}`\n"
+            f"  After: `{fmt_balance(ds)}`\n\n"
+            f"👥 *Referral Reward (Tiered):*\n"
+            f"  First {rt} referrals: `{fmt_balance(rp)}`\n"
+            f"  After: `{fmt_balance(rs)}`\n\n"
             f"Choose a setting to edit:"
         )
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎁 Edit Daily Bonus", callback_data="adm:edit_set:daily_bonus")],
-            [InlineKeyboardButton("👥 Edit Referral Reward", callback_data="adm:edit_set:referral_reward")],
-            [InlineKeyboardButton("🎉 Edit Signup Bonus", callback_data="adm:edit_set:signup_bonus")],
-            [InlineKeyboardButton("📋 Edit Task Reward", callback_data="adm:edit_set:task_reward")],
+            [InlineKeyboardButton("🎉 Signup Bonus", callback_data="adm:edit_set:signup_bonus")],
+            [InlineKeyboardButton("📋 Task Reward", callback_data="adm:edit_set:task_reward")],
+            [InlineKeyboardButton("🎁 Daily Primary", callback_data="adm:edit_set:daily_bonus_primary"),
+             InlineKeyboardButton("🎁 Daily Secondary", callback_data="adm:edit_set:daily_bonus_secondary")],
+            [InlineKeyboardButton("🎁 Daily Threshold", callback_data="adm:edit_set:daily_bonus_threshold")],
+            [InlineKeyboardButton("👥 Ref Primary", callback_data="adm:edit_set:referral_reward_primary"),
+             InlineKeyboardButton("👥 Ref Secondary", callback_data="adm:edit_set:referral_reward_secondary")],
+            [InlineKeyboardButton("👥 Ref Threshold", callback_data="adm:edit_set:referral_reward_threshold")],
             [InlineKeyboardButton("⬅️ Back", callback_data="adm:back")]
         ])
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -266,10 +278,14 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["edit_setting_key"] = key
         
         labels = {
-            "daily_bonus": "Daily Bonus", 
-            "referral_reward": "Referral Reward",
             "signup_bonus": "Signup Bonus",
-            "task_reward": "Task Reward"
+            "task_reward": "Task Reward",
+            "daily_bonus_primary": "Daily Bonus (Primary)", 
+            "daily_bonus_secondary": "Daily Bonus (After Threshold)",
+            "daily_bonus_threshold": "Daily Bonus Threshold (days)",
+            "referral_reward_primary": "Referral Reward (Primary)",
+            "referral_reward_secondary": "Referral Reward (After Threshold)",
+            "referral_reward_threshold": "Referral Threshold (referrals)",
         }
         await query.edit_message_text(
             f"⚙️ *Edit {labels.get(key, key)}*\n\n"

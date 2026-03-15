@@ -11,6 +11,16 @@ from core.ui import nav_keyboard, fmt_balance, progress_bar
 MEDALS = ["🥇", "🥈", "🥉"]
 
 
+async def _count_daily_claims(user_id: int) -> int:
+    """Count how many daily bonuses a user has claimed (for tiered logic)."""
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchval(
+            "SELECT COUNT(*) FROM transactions WHERE user_id=$1 AND type='daily_bonus'",
+            user_id
+        )
+
+
 async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = update.effective_user.id
@@ -30,11 +40,20 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Daily bonus status
     daily_available = (not user["last_daily"]) or (user["last_daily"] < date.today())
-    daily_amount_str = await db.get_setting("daily_bonus", "0.50")
-    daily_amount = float(daily_amount_str)
+
+    # Calculate tiered daily amount for this user
+    past_daily_claims = await _count_daily_claims(user_id)
+    daily_threshold = int(await db.get_setting("daily_bonus_threshold", "5"))
+    if past_daily_claims < daily_threshold:
+        daily_amount = float(await db.get_setting("daily_bonus_primary", "0.20"))
+        days_left = daily_threshold - past_daily_claims
+        daily_label = f"🔥 *Boosted rate!* {days_left} day(s) of premium bonus left"
+    else:
+        daily_amount = float(await db.get_setting("daily_bonus_secondary", "0.02"))
+        daily_label = "Standard daily rate"
 
     text = (
-        f"💰 *Earnings*\n\n"
+        f"💰 *Earnings Dashboard*\n\n"
         f"💵 Balance: *{fmt_balance(user['balance'])}*\n"
         f"📊 Overall Rank: *#{rank}*\n"
         f"🏆 Weekly Invite Rank: *#{weekly_rank}*\n"
@@ -46,7 +65,7 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buttons = [[InlineKeyboardButton("📋 Go to Tasks", callback_data="nav:tasks")]]
     else:
         if daily_available:
-            text += f"🎁 Daily bonus available! Tap to claim *{fmt_balance(daily_amount)}*\n"
+            text += f"🎁 Daily bonus: *{fmt_balance(daily_amount)}* — {daily_label}\n"
             text += f"_(Missed days cannot be claimed later)_\n"
         else:
             text += f"🎁 Daily bonus: claimed ✅ — come back tomorrow!\n"
@@ -63,6 +82,7 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
             buttons.append([InlineKeyboardButton("🎁 Claim Daily Bonus", callback_data="earnings:daily")])
         buttons.append([InlineKeyboardButton("🏆 Full Leaderboard", callback_data="earnings:leaderboard")])
         buttons.append([InlineKeyboardButton("📜 Full History", callback_data="earnings:history")])
+        buttons.append([InlineKeyboardButton("👥 Invite & Earn More", callback_data="nav:refer")])
 
     reply_markup = InlineKeyboardMarkup(buttons + [[InlineKeyboardButton("🏠 Home", callback_data="nav:start")]])
 
@@ -80,8 +100,13 @@ async def claim_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
     success, reason, amount = await db.claim_daily_bonus(user_id)
     user = await db.get_user(user_id)
     
-    daily_amount_str = await db.get_setting("daily_bonus", "0.50")
-    daily_amount = float(daily_amount_str)
+    # Get what tomorrow's amount would be for the "come back" message
+    past_claims = await _count_daily_claims(user_id)
+    threshold = int(await db.get_setting("daily_bonus_threshold", "5"))
+    if past_claims < threshold:
+        next_daily = float(await db.get_setting("daily_bonus_primary", "0.20"))
+    else:
+        next_daily = float(await db.get_setting("daily_bonus_secondary", "0.02"))
 
     if success:
         text = (
@@ -95,7 +120,7 @@ async def claim_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"⏰ *Already Claimed Today*\n\n"
             f"You already claimed your bonus today.\n\n"
             f"💵 Balance: *{fmt_balance(user['balance'])}*\n\n"
-            f"Come back tomorrow for *{fmt_balance(daily_amount)}* 🔄"
+            f"Come back tomorrow for *{fmt_balance(next_daily)}* 🔄"
         )
     else:
         text = "⚠️ Complete all tasks first to claim daily bonuses."

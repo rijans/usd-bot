@@ -99,20 +99,22 @@ async def _send_home(update: Update, record, is_new=False):
             f"👉 Tap *Tasks* below to get started."
         )
     else:
-        daily_amount = await db.get_setting("daily_bonus", "0.50")
-        ref_amount = await db.get_setting("referral_reward", "0.40")
+        daily_primary = await db.get_setting("daily_bonus_primary", "0.20")
+        ref_primary = await db.get_setting("referral_reward_primary", "0.30")
         signup_amount = await db.get_setting("signup_bonus", "1.00")
-        task_amount = await db.get_setting("task_reward", "0.50")
+        task_amount = await db.get_setting("task_reward", "0.30")
+        ref_threshold = await db.get_setting("referral_reward_threshold", "5")
         
         text += (
             f"💰 Balance: *{fmt_balance(record['balance'])}*\n"
             f"👥 Total Invites: *{record['total_invites']}*\n\n"
             f"📖 *How to earn:*\n"
-            f"• Get {fmt_balance(signup_amount)} simply for joining\n"
-            f"• Earn {fmt_balance(task_amount)} for every task you complete\n"
-            f"• Earn {fmt_balance(ref_amount)} per referral (after they finish tasks)\n"
-            f"• Claim {fmt_balance(daily_amount)} daily bonus for free\n"
-            f"• Climb the leaderboard for weekly prizes\n\n"
+            f"• 🎉 {fmt_balance(signup_amount)} welcome bonus (instant!)\n"
+            f"• 📋 {fmt_balance(task_amount)} per task completed\n"
+            f"• 👥 Up to {fmt_balance(ref_primary)} per referral (first {ref_threshold} pay more!)\n"
+            f"• 🎁 Up to {fmt_balance(daily_primary)} daily bonus\n"
+            f"• 🏆 Climb the leaderboard for weekly prizes\n\n"
+            f"🚀 *Invite friends to earn faster — the more you refer, the closer you get to $20!*\n\n"
             f"💸 *Withdraw via:* TON · USDT · Telegram Stars · PayPal"
         )
 
@@ -146,20 +148,22 @@ async def _edit_home(query, record):
             f"👉 Tap *Tasks* to continue."
         )
     else:
-        daily_amount = await db.get_setting("daily_bonus", "0.50")
-        ref_amount = await db.get_setting("referral_reward", "0.40")
+        daily_primary = await db.get_setting("daily_bonus_primary", "0.20")
+        ref_primary = await db.get_setting("referral_reward_primary", "0.30")
         signup_amount = await db.get_setting("signup_bonus", "1.00")
-        task_amount = await db.get_setting("task_reward", "0.50")
+        task_amount = await db.get_setting("task_reward", "0.30")
+        ref_threshold = await db.get_setting("referral_reward_threshold", "5")
         
         text += (
             f"💰 Balance: *{fmt_balance(record['balance'])}*\n"
             f"👥 Total Invites: *{record['total_invites']}*\n\n"
             f"📖 *How to earn:*\n"
-            f"• {fmt_balance(signup_amount)} welcome bonus\n"
-            f"• {fmt_balance(task_amount)} per task completed\n"
-            f"• {fmt_balance(ref_amount)} per referral (after they finish tasks)\n"
-            f"• {fmt_balance(daily_amount)} daily bonus\n"
-            f"• Weekly leaderboard prizes\n\n"
+            f"• 🎉 {fmt_balance(signup_amount)} welcome bonus\n"
+            f"• 📋 {fmt_balance(task_amount)} per task completed\n"
+            f"• 👥 Up to {fmt_balance(ref_primary)} per referral (first {ref_threshold} pay more!)\n"
+            f"• 🎁 Up to {fmt_balance(daily_primary)} daily bonus\n"
+            f"• 🏆 Weekly leaderboard prizes\n\n"
+            f"🚀 *Invite more friends to earn faster!*\n\n"
             f"💸 *Withdraw via:* TON · USDT · Telegram Stars · PayPal"
         )
 

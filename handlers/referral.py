@@ -36,11 +36,26 @@ async def _render_refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     weekly_rank = await db.get_weekly_invite_rank(user_id)
     top = await db.get_leaderboard(3)
 
+    # Get tiered referral info
+    ref_primary = await db.get_setting("referral_reward_primary", "0.30")
+    ref_secondary = await db.get_setting("referral_reward_secondary", "0.05")
+    ref_threshold = await db.get_setting("referral_reward_threshold", "5")
+    invites = user['total_invites']
+    
+    if invites < int(ref_threshold):
+        current_rate = ref_primary
+        boost_left = int(ref_threshold) - invites
+        rate_info = f"\n\n🔥 *Boosted rate active!* Your next {boost_left} referral(s) earn *{fmt_balance(ref_primary)}* each!"
+    else:
+        current_rate = ref_secondary
+        rate_info = f"\n\nYou earn *{fmt_balance(ref_secondary)}* per referral. Keep inviting to grow your balance!"
+
     text = (
-        f"👥 *Refer & Earn*\n\n"
+        f"👥 *Invite & Earn*\n\n"
         f"🔗 Your invite link:\n"
         f"`{link}`\n\n"
-        f"💡 Share this link with friends! When they join and complete all tasks, you earn *$0.40* automatically.\n\n"
+        f"💡 Share this link with friends! When they join and complete all tasks, you earn *{fmt_balance(current_rate)}* automatically.\n"
+        f"{rate_info}\n\n"
         f"📊 *Your Stats:*\n"
         f"✅ Total Invites: *{user['total_invites']}*\n"
         f"💰 Balance: *{fmt_balance(user['balance'])}*\n"
