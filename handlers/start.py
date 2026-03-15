@@ -114,7 +114,7 @@ async def _send_home(update: Update, record, is_new=False):
             f"• 👥 Up to {fmt_balance(ref_primary)} per referral (first {ref_threshold} pay more!)\n"
             f"• 🎁 Up to {fmt_balance(daily_primary)} daily bonus\n"
             f"• 🏆 Climb the leaderboard for weekly prizes\n\n"
-            f"🚀 *Invite friends to earn faster — the more you refer, the closer you get to $20!*\n\n"
+            f"🚀 *Invite friends to earn faster — the more you refer, the closer you get to $20(minimum withdraw amount)!*\n\n"
             f"💸 *Withdraw via:* TON · USDT · Telegram Stars · PayPal"
         )
 
