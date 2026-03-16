@@ -2,7 +2,7 @@ import logging
 import os
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.error import BadRequest
+from telegram.error import BadRequest, Conflict
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -47,6 +47,10 @@ async def post_init(application: Application) -> None:
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     err = context.error
     if isinstance(err, BadRequest) and "Message is not modified" in str(err):
+        return
+        
+    if isinstance(err, Conflict):
+        log.warning("Conflict error detected - this is normal during bot restart/deployment.")
         return
     
     log.error("Unhandled exception", exc_info=err)
