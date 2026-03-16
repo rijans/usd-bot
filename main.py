@@ -30,6 +30,7 @@ from handlers.admin import (
     ADD_TASK_TITLE, ADD_TASK_CHAT, ADD_TASK_LINK,
     BROADCAST_TEXT, EDIT_SETTING, WREJECT_REASON,
     EDIT_TASK_TITLE, EDIT_TASK_CHAT, EDIT_TASK_LINK,
+    admin_ids
 )
 
 logging.basicConfig(
@@ -110,8 +111,7 @@ async def reply_kb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await nav_withdraw(update, context)
 
 async def cmd_reseed_fake(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    admin_ids = [int(x) for x in os.environ.get("ADMIN_IDS", "").split(",") if x.isdigit()]
-    if update.effective_user.id not in admin_ids:
+    if update.effective_user.id not in admin_ids():
         return
     pool = await db.get_pool()
     async with pool.acquire() as conn:
