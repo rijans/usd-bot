@@ -122,7 +122,6 @@ async def claim_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💵 Balance: *{fmt_balance(user['balance'])}*\n\n"
             f"Come back tomorrow for *{fmt_balance(next_daily)}* 🔄"
         )
-        )
     elif reason.startswith("needs_invites"):
         current_invites = reason.split(":")[1]
         text = (
