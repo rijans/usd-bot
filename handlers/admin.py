@@ -120,14 +120,17 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("Not found.", show_alert=True)
             return ConversationHandler.END
         status = "✅ Active" if task["active"] else "❌ Inactive"
+        # Show global task reward from settings (not the per-task column which defaults to 0)
+        task_reward_str = await db.get_setting("task_reward", "0.30")
         text = (
             f"📌 *{task['title']}*\n\n"
             f"Chat ID: `{task['chat_id']}`\n"
             f"Link: {task['invite_link']}\n"
-            f"Reward: {fmt_balance(task['reward'])}\n"
+            f"Reward: {fmt_balance(float(task_reward_str))} _(global setting)_\n"
             f"Status: {status}"
         )
         toggle_label = "⏸ Deactivate" if task["active"] else "▶️ Activate"
+        context.user_data["adm_prev_menu"] = "adm:tasks"
         await query.edit_message_text(
             text, parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([
@@ -163,6 +166,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task_id = int(data.split(":")[2])
         task = await db.get_task(task_id)
         context.user_data["edit_task_id"] = task_id
+        context.user_data["adm_prev_menu"] = f"adm:task_detail:{task_id}"
         await query.edit_message_text(
             f"✏️ *Edit Task Title*\n\n"
             f"Current: `{task['title']}`\n\n"
@@ -175,6 +179,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task_id = int(data.split(":")[2])
         task = await db.get_task(task_id)
         context.user_data["edit_task_id"] = task_id
+        context.user_data["adm_prev_menu"] = f"adm:task_detail:{task_id}"
         await query.edit_message_text(
             f"🔢 *Edit Chat ID*\n\n"
             f"Current: `{task['chat_id']}`\n\n"
@@ -187,6 +192,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         task_id = int(data.split(":")[2])
         task = await db.get_task(task_id)
         context.user_data["edit_task_id"] = task_id
+        context.user_data["adm_prev_menu"] = f"adm:task_detail:{task_id}"
         await query.edit_message_text(
             f"🔗 *Edit Invite URL*\n\n"
             f"Current: `{task['invite_link']}`\n\n"
@@ -197,6 +203,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Add task: start ───────────────────────────────────────────────────────
     elif data == "adm:add_task":
+        context.user_data["adm_prev_menu"] = "adm:tasks"
         await query.edit_message_text(
             "📋 *Add New Task*\n\n"
             "Step 1/3 — Send the *task title* (e.g. 'Join Our Announcement Channel'):\n\n"
@@ -242,6 +249,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Broadcast: start ──────────────────────────────────────────────────────
     elif data == "adm:broadcast":
+        context.user_data["adm_prev_menu"] = "adm:back"
         await query.edit_message_text(
             "📢 *Broadcast Message*\n\n"
             "Send the message to broadcast to all users.\n"
@@ -318,6 +326,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("adm:edit_set:"):
         key = data.split(":")[2]
         context.user_data["edit_setting_key"] = key
+        context.user_data["adm_prev_menu"] = "adm:settings"
         
         labels = {
             "signup_bonus": "Signup Bonus",
@@ -566,9 +575,32 @@ async def _all_tasks_including_inactive():
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancel current conversation and return to the previous admin menu if possible."""
+    prev_menu = context.user_data.pop("adm_prev_menu", None)
     context.user_data.clear()
-    if update.message:
-        await update.message.reply_text("❌ Cancelled.")
+    
+    if prev_menu and update.message:
+        # Build a fake callback-like navigation by sending an inline button
+        # so the user can tap Back without having to re-type /admin
+        menu_labels = {
+            "adm:tasks": "⬅️ Back to Tasks",
+            "adm:settings": "⬅️ Back to Settings",
+            "adm:back": "⬅️ Back to Admin Panel",
+        }
+        # If it's a task_detail, extract the ID for the label
+        if prev_menu.startswith("adm:task_detail:"):
+            label = "⬅️ Back to Task"
+        else:
+            label = menu_labels.get(prev_menu, "⬅️ Back")
+        await update.message.reply_text(
+            "❌ Cancelled.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(label, callback_data=prev_menu)]])
+        )
+    elif update.message:
+        await update.message.reply_text(
+            "❌ Cancelled.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Admin Panel", callback_data="adm:back")]])
+        )
     return ConversationHandler.END
 
 
