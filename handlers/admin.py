@@ -23,12 +23,15 @@ import core.db as db
 from core.ui import fmt_balance
 
 # States
-ADD_TASK_TITLE = 20
-ADD_TASK_CHAT  = 21
-ADD_TASK_LINK  = 22
-BROADCAST_TEXT = 30
-EDIT_SETTING   = 40
-WREJECT_REASON = 50
+ADD_TASK_TITLE  = 20
+ADD_TASK_CHAT   = 21
+ADD_TASK_LINK   = 22
+BROADCAST_TEXT  = 30
+EDIT_SETTING    = 40
+WREJECT_REASON  = 50
+EDIT_TASK_TITLE = 60
+EDIT_TASK_CHAT  = 61
+EDIT_TASK_LINK  = 62
 
 
 def admin_ids() -> list[int]:
@@ -124,12 +127,16 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Reward: {fmt_balance(task['reward'])}\n"
             f"Status: {status}"
         )
+        toggle_label = "⏸ Deactivate" if task["active"] else "▶️ Activate"
         await query.edit_message_text(
             text, parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔄 Toggle Active/Inactive", callback_data=f"adm:toggle:{task_id}")],
-                [InlineKeyboardButton("🗑 Delete Task", callback_data=f"adm:delete:{task_id}")],
-                [InlineKeyboardButton("⬅️ Back", callback_data="adm:tasks")],
+                [InlineKeyboardButton("✏️ Edit Title",   callback_data=f"adm:edit_task_title:{task_id}"),
+                 InlineKeyboardButton("🔢 Edit Chat ID", callback_data=f"adm:edit_task_chat:{task_id}")],
+                [InlineKeyboardButton("🔗 Edit URL",     callback_data=f"adm:edit_task_link:{task_id}")],
+                [InlineKeyboardButton(toggle_label,       callback_data=f"adm:toggle:{task_id}"),
+                 InlineKeyboardButton("🗑 Delete",        callback_data=f"adm:delete:{task_id}")],
+                [InlineKeyboardButton("⬅️ Back",          callback_data="adm:tasks")],
             ])
         )
         return ConversationHandler.END
@@ -140,9 +147,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = await db.toggle_task(task_id)
         state = "activated ✅" if result["active"] else "deactivated ❌"
         await query.answer(f"Task {state}!", show_alert=True)
-        # Re-render task list
-        context.user_data["_adm_data"] = "adm:tasks"
-        query.data = "adm:tasks"
+        query.data = f"adm:task_detail:{task_id}"
         return await admin_callback(update, context)
 
     # ── Delete task ───────────────────────────────────────────────────────────
@@ -152,6 +157,43 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("Deleted!" if ok else "Failed.", show_alert=True)
         query.data = "adm:tasks"
         return await admin_callback(update, context)
+
+    # ── Edit task fields ──────────────────────────────────────────────────────
+    elif data.startswith("adm:edit_task_title:"):
+        task_id = int(data.split(":")[2])
+        task = await db.get_task(task_id)
+        context.user_data["edit_task_id"] = task_id
+        await query.edit_message_text(
+            f"✏️ *Edit Task Title*\n\n"
+            f"Current: `{task['title']}`\n\n"
+            f"Send the new title:\n\n_(Type /cancel to abort)_",
+            parse_mode="Markdown"
+        )
+        return EDIT_TASK_TITLE
+
+    elif data.startswith("adm:edit_task_chat:"):
+        task_id = int(data.split(":")[2])
+        task = await db.get_task(task_id)
+        context.user_data["edit_task_id"] = task_id
+        await query.edit_message_text(
+            f"🔢 *Edit Chat ID*\n\n"
+            f"Current: `{task['chat_id']}`\n\n"
+            f"Send the new @username or numeric chat ID:\n\n_(Type /cancel to abort)_",
+            parse_mode="Markdown"
+        )
+        return EDIT_TASK_CHAT
+
+    elif data.startswith("adm:edit_task_link:"):
+        task_id = int(data.split(":")[2])
+        task = await db.get_task(task_id)
+        context.user_data["edit_task_id"] = task_id
+        await query.edit_message_text(
+            f"🔗 *Edit Invite URL*\n\n"
+            f"Current: `{task['invite_link']}`\n\n"
+            f"Send the new invite link (must start with `https://t.me/`):\n\n_(Type /cancel to abort)_",
+            parse_mode="Markdown"
+        )
+        return EDIT_TASK_LINK
 
     # ── Add task: start ───────────────────────────────────────────────────────
     elif data == "adm:add_task":
@@ -287,9 +329,18 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "referral_reward_secondary": "Referral Reward (After Threshold)",
             "referral_reward_threshold": "Referral Threshold (referrals)",
         }
+        # Show current value
+        defaults = {
+            "signup_bonus": "1.00", "task_reward": "0.30",
+            "daily_bonus_primary": "0.20", "daily_bonus_secondary": "0.02",
+            "daily_bonus_threshold": "5", "referral_reward_primary": "0.30",
+            "referral_reward_secondary": "0.05", "referral_reward_threshold": "5",
+        }
+        current_val = await db.get_setting(key, defaults.get(key, "0"))
         await query.edit_message_text(
             f"⚙️ *Edit {labels.get(key, key)}*\n\n"
-            f"Send the new amount in dollars (e.g. `0.25` or `1.50`).\n\n"
+            f"Current value: `{current_val}`\n\n"
+            f"Send the new value (number).\n\n"
             f"_(Type /cancel to abort)_",
             parse_mode="Markdown"
         )
@@ -418,20 +469,29 @@ async def broadcast_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @require_admin
 async def edit_setting_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
     val_str = update.message.text.strip()
+    key = context.user_data.get("edit_setting_key", "")
+    # Threshold fields are integers and can be 0
+    is_threshold = "threshold" in key
     try:
         val = float(val_str)
         if val < 0:
             raise ValueError
+        if is_threshold and not val_str.isdigit():
+            raise ValueError
     except ValueError:
-        await update.message.reply_text("⚠️ Invalid amount. Must be a positive number like `0.50`. Try again:", parse_mode="Markdown")
+        hint = "a whole number like `5`" if is_threshold else "a positive number like `0.50`"
+        await update.message.reply_text(
+            f"⚠️ Invalid value. Must be {hint}. Try again:", parse_mode="Markdown"
+        )
         return EDIT_SETTING
 
     key = context.user_data.pop("edit_setting_key", None)
     if key:
-        await db.set_setting(key, str(val))
+        await db.set_setting(key, str(int(val)) if is_threshold else str(val))
     
+    display = str(int(val)) if is_threshold else fmt_balance(val)
     await update.message.reply_text(
-        f"✅ *Setting Updated!*\n\nNew value: `{fmt_balance(val)}`",
+        f"✅ *Setting Updated!*\n\nNew value: `{display}`",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back to Settings", callback_data="adm:settings")]])
     )
@@ -498,7 +558,6 @@ async def _show_withdrawals(query):
         except Exception:
             pass
 
-
 async def _all_tasks_including_inactive():
     """Get all tasks including inactive ones for admin view."""
     pool = await db.get_pool()
@@ -510,4 +569,76 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.clear()
     if update.message:
         await update.message.reply_text("❌ Cancelled.")
+    return ConversationHandler.END
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Edit Task conversation steps
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_admin
+async def edit_task_title(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    task_id = context.user_data.pop("edit_task_id", None)
+    new_title = update.message.text.strip()
+    if not new_title or not task_id:
+        await update.message.reply_text("❌ Error. Try again from the task menu.")
+        return ConversationHandler.END
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE tasks SET title=$1 WHERE id=$2", new_title, task_id)
+    await update.message.reply_text(
+        f"✅ *Title updated!*\n\nNew title: `{new_title}`",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back to Task", callback_data=f"adm:task_detail:{task_id}")]])
+    )
+    return ConversationHandler.END
+
+
+@require_admin
+async def edit_task_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    task_id = context.user_data.pop("edit_task_id", None)
+    chat_id = update.message.text.strip()
+    if not task_id:
+        await update.message.reply_text("❌ Error. Try again from the task menu.")
+        return ConversationHandler.END
+    if not (chat_id.startswith("@") or chat_id.lstrip("-").isdigit()):
+        await update.message.reply_text(
+            "⚠️ Invalid format. Use `@username` or a numeric ID like `-1001234567890`. Try again:",
+            parse_mode="Markdown"
+        )
+        context.user_data["edit_task_id"] = task_id
+        return EDIT_TASK_CHAT
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE tasks SET chat_id=$1 WHERE id=$2", chat_id, task_id)
+    await update.message.reply_text(
+        f"✅ *Chat ID updated!*\n\nNew Chat ID: `{chat_id}`",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back to Task", callback_data=f"adm:task_detail:{task_id}")]])
+    )
+    return ConversationHandler.END
+
+
+@require_admin
+async def edit_task_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    task_id = context.user_data.pop("edit_task_id", None)
+    link = update.message.text.strip()
+    if not task_id:
+        await update.message.reply_text("❌ Error. Try again from the task menu.")
+        return ConversationHandler.END
+    if not link.startswith("https://t.me/"):
+        await update.message.reply_text(
+            "⚠️ Link must start with `https://t.me/`. Try again:",
+            parse_mode="Markdown"
+        )
+        context.user_data["edit_task_id"] = task_id
+        return EDIT_TASK_LINK
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE tasks SET invite_link=$1 WHERE id=$2", link, task_id)
+    await update.message.reply_text(
+        f"✅ *Invite link updated!*",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back to Task", callback_data=f"adm:task_detail:{task_id}")]])
+    )
     return ConversationHandler.END

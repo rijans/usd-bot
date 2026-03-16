@@ -25,8 +25,11 @@ from handlers.withdraw import (
 from handlers.admin import (
     cmd_admin, admin_callback, cancel, edit_setting_value,
     add_task_title, add_task_chat, add_task_link,
+    edit_task_title, edit_task_chat, edit_task_link,
     broadcast_text, wreject_reason_text,
-    ADD_TASK_TITLE, ADD_TASK_CHAT, ADD_TASK_LINK, BROADCAST_TEXT, EDIT_SETTING, WREJECT_REASON
+    ADD_TASK_TITLE, ADD_TASK_CHAT, ADD_TASK_LINK,
+    BROADCAST_TEXT, EDIT_SETTING, WREJECT_REASON,
+    EDIT_TASK_TITLE, EDIT_TASK_CHAT, EDIT_TASK_LINK,
 )
 
 logging.basicConfig(
@@ -121,7 +124,6 @@ def main():
     app.add_handler(CommandHandler("earnings", cmd_earnings))
     app.add_handler(CommandHandler("refer",    cmd_refer))
     app.add_handler(CommandHandler("share",    cmd_share))
-    app.add_handler(CommandHandler("admin",    cmd_admin))
 
     # ── Inline nav buttons ────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(nav_start,    pattern="^nav:start$"))
@@ -164,12 +166,15 @@ def main():
             CallbackQueryHandler(admin_callback, pattern="^adm:"),
         ],
         states={
-            ADD_TASK_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_title)],
-            ADD_TASK_CHAT:  [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_chat)],
-            ADD_TASK_LINK:  [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_link)],
-            BROADCAST_TEXT: [MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_text)],
-            EDIT_SETTING:   [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_setting_value)],
-            WREJECT_REASON: [MessageHandler(filters.TEXT & ~filters.COMMAND, wreject_reason_text)],
+            ADD_TASK_TITLE:   [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_title)],
+            ADD_TASK_CHAT:    [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_chat)],
+            ADD_TASK_LINK:    [MessageHandler(filters.TEXT & ~filters.COMMAND, add_task_link)],
+            BROADCAST_TEXT:   [MessageHandler(filters.TEXT & ~filters.COMMAND, broadcast_text)],
+            EDIT_SETTING:     [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_setting_value)],
+            WREJECT_REASON:   [MessageHandler(filters.TEXT & ~filters.COMMAND, wreject_reason_text)],
+            EDIT_TASK_TITLE:  [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_task_title)],
+            EDIT_TASK_CHAT:   [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_task_chat)],
+            EDIT_TASK_LINK:   [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_task_link)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         per_message=False,
