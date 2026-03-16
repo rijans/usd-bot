@@ -70,12 +70,12 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             text += f"🎁 Daily bonus: claimed ✅ — come back tomorrow!\n"
 
-        text += "\n🏆 *Weekly Top 5 Inviters:*\n"
+        text += "\n🏆 *Weekly Top 5 Inviters (Current):*\n"
         top = await db.get_leaderboard(5)
         for i, u in enumerate(top, 1):
             medal = MEDALS[i - 1] if i <= 3 else f"{i}."
             name = (u["full_name"] or "User")[:20]
-            text += f"{medal} {name} — *{u['total_invites']} invites*\n"
+            text += f"{medal} {name} — *{u['total_invites']} inv* | 💵 {fmt_balance(u['balance'])}\n"
 
         buttons = []
         if daily_available:
@@ -148,7 +148,7 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         medal = MEDALS[i - 1] if i <= 3 else f"{i}."
         prize = {1: "$10", 2: "$10", 3: "$10"}.get(i, "$5" if i <= 10 else "$3")
         name = (u["full_name"] or "User")[:20]
-        text += f"{medal} {name} — *{u['total_invites']} inv* ({prize})\n"
+        text += f"{medal} {name} — *{u['total_invites']} inv* | 💵 {fmt_balance(u['balance'])} (Prize: {prize})\n"
 
     text += (
         f"\n📊 *Your Position:* #{weekly_rank}\n"
