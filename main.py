@@ -40,9 +40,36 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
+async def daily_bonus_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        users = await conn.fetch("SELECT user_id FROM users WHERE user_id > 0 AND (last_daily IS NULL OR last_daily < CURRENT_DATE)")
+        msg = "🎁 *Your daily bonus is ready!*\n\nClaim it now from the 💰 Earnings menu! (Requires 2 invites this week to activate)"
+        for u in users:
+            try:
+                await context.bot.send_message(u["user_id"], msg, parse_mode="Markdown")
+                import asyncio
+                await asyncio.sleep(0.05) # Safe rate limit: 20 msgs per sec
+            except Exception:
+                pass
+
+async def test_daily_job(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_user.id not in admin_ids():
+        return
+    await update.message.reply_text("Triggering test daily broadcast...")
+    await daily_bonus_reminder(context)
+    await update.message.reply_text("Broadcast complete.")
+
+
 async def post_init(application: Application) -> None:
     await db.init_schema()
     log.info("DB schema ready.")
+    
+    # Schedule daily bonus reminder at 10:00 UTC
+    import datetime
+    t = datetime.time(hour=10, minute=0, tzinfo=datetime.timezone.utc)
+    application.job_queue.run_daily(daily_bonus_reminder, t)
+    log.info(f"Daily job scheduled at {t} UTC")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -138,6 +165,7 @@ def main():
     app.add_handler(CommandHandler("refer",    cmd_refer))
     app.add_handler(CommandHandler("share",    cmd_share))
     app.add_handler(CommandHandler("reseed_fake", cmd_reseed_fake))
+    app.add_handler(CommandHandler("test_daily_job", test_daily_job))
 
     # ── Inline nav buttons ────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(nav_start,    pattern="^nav:start$"))

@@ -122,6 +122,15 @@ async def claim_daily(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💵 Balance: *{fmt_balance(user['balance'])}*\n\n"
             f"Come back tomorrow for *{fmt_balance(next_daily)}* 🔄"
         )
+        )
+    elif reason.startswith("needs_invites"):
+        current_invites = reason.split(":")[1]
+        text = (
+            f"⚠️ *Weekly Requirement Not Met*\n\n"
+            f"You must invite at least 2 new users this week to unlock daily claims!\n\n"
+            f"📊 *Your progress:* {current_invites}/2 invites this week.\n\n"
+            f"Get your invite link from the 👥 Refer menu to complete this requirement."
+        )
     else:
         text = "⚠️ Complete all tasks first to claim daily bonuses."
 

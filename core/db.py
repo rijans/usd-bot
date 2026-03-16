@@ -286,6 +286,16 @@ async def get_weekly_invite_rank(user_id: int) -> int:
         return row["rank"]
 
 
+async def get_weekly_referrals(user_id: int) -> int:
+    """Returns the number of accurate referrals the user made since Monday of the current week."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchval(
+            """SELECT COUNT(*) FROM transactions 
+               WHERE user_id=$1 AND type='referral' AND created_at >= date_trunc('week', NOW())""",
+            user_id
+        )
+
 async def get_setting(key: str, default: str) -> str:
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -313,6 +323,11 @@ async def claim_daily_bonus(user_id: int) -> tuple[bool, str, float]:
         today = date.today()
         if row["last_daily"] and row["last_daily"] >= today:
             return False, "already_claimed", 0.0
+
+        # Enforce weekly referral quota
+        weekly_refs = await get_weekly_referrals(user_id)
+        if weekly_refs < 2:
+            return False, f"needs_invites:{weekly_refs}", 0.0
 
         # Count previous daily claims for tiered logic
         past_claims = await conn.fetchval(
