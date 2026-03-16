@@ -262,8 +262,8 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── Full Stats ────────────────────────────────────────────────────────────
     elif data == "adm:stats":
         stats = await db.get_stats()
-        top_inviters = await db.get_leaderboard(10)
-        top_earners = await db.get_earners_leaderboard(10)
+        top_inviters = await db.get_leaderboard(10, include_fake=False)
+        top_earners = await db.get_earners_leaderboard(10, include_fake=False)
         
         text = (
             f"📊 *Full Statistics*\n\n"

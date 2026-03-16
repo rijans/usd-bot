@@ -375,11 +375,11 @@ async def get_stats() -> dict:
         }
 
 
-async def get_leaderboard(limit: int = 20) -> list[asyncpg.Record]:
+async def get_leaderboard(limit: int = 20, include_fake: bool = True) -> list[asyncpg.Record]:
     pool = await get_pool()
     async with pool.acquire() as conn:
         show_fake = await get_setting("show_fake_leaders", "1")
-        if show_fake == "1":
+        if show_fake == "1" and include_fake:
             # Select real users + ~30% of fake users based on week hash
             query = """
             WITH week_seed AS (
@@ -399,11 +399,11 @@ async def get_leaderboard(limit: int = 20) -> list[asyncpg.Record]:
                 limit
             )
 
-async def get_earners_leaderboard(limit: int = 10) -> list[asyncpg.Record]:
+async def get_earners_leaderboard(limit: int = 10, include_fake: bool = True) -> list[asyncpg.Record]:
     pool = await get_pool()
     async with pool.acquire() as conn:
         show_fake = await get_setting("show_fake_leaders", "1")
-        if show_fake == "1":
+        if show_fake == "1" and include_fake:
             query = """
             WITH week_seed AS (
                 SELECT EXTRACT(WEEK FROM NOW()) AS w
