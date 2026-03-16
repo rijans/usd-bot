@@ -108,9 +108,41 @@ async def init_schema():
                       ('daily_bonus_threshold', '5'),
                       ('referral_reward_primary', '0.30'),
                       ('referral_reward_secondary', '0.05'),
-                      ('referral_reward_threshold', '5')
+                      ('referral_reward_threshold', '5'),
+                      ('show_fake_leaders', '1')
                ON CONFLICT (key) DO NOTHING"""
         )
+
+        # Seed fake users if they don't exist
+        # We use negative user_ids (-1001 to -1050)
+        import random
+        fake_count = await conn.fetchval("SELECT COUNT(*) FROM users WHERE user_id < 0")
+        if fake_count == 0:
+            first_names = ["Alex", "Jordan", "Taylor", "Casey", "Riley", "Jamie", "Avery", "Peyton", 
+                           "Cameron", "Parker", "Morgan", "Sam", "Drew", "Skyler", "Blake", "Charlie",
+                           "Logan", "Rowan", "Hayden", "Quinn", "Dylan", "Reese", "Kendall", "Dakota",
+                           "Micah", "Emerson", "Finley", "River", "Rory", "Sage", "Spencer", "Ariel",
+                           "Ellis", "Frankie", "Harley", "Marley", "Monroe", "Oakley", "Phoenix", "Remy",
+                           "Robin", "Shiloh", "Stevie", "Sutton", "Tatum", "Wilder", "Wren", "Amari",
+                           "Arden", "Bellamy"]
+            
+            # Simple seeded generation for initial stability
+            rng = random.Random(42)
+            
+            for i in range(50):
+                uid = -1001 - i
+                name = rng.choice(first_names)
+                invites = rng.randint(50, 300)
+                # Give rough balance: $1 signup + $1.5 tasks + $1.5 daily + ~$10-30 referrals
+                bal = 4.0 + (invites * 0.1) + rng.uniform(-5.0, 10.0) 
+                bal = max(bal, 4.0)
+                
+                await conn.execute(
+                    """INSERT INTO users (user_id, full_name, username, balance, total_invites, tasks_done)
+                       VALUES ($1, $2, $3, $4, $5, TRUE)
+                       ON CONFLICT DO NOTHING""",
+                    uid, name, f"user_{abs(uid)}", bal, invites
+                )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -194,11 +226,32 @@ async def get_rank(user_id: int) -> int:
 async def get_weekly_invite_rank(user_id: int) -> int:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT COUNT(*)+1 AS rank FROM users WHERE total_invites > "
-            "(SELECT total_invites FROM users WHERE user_id=$1)",
-            user_id
-        )
+        show_fake = await get_setting("show_fake_leaders", "1")
+        if show_fake == "1":
+            # Rank includes real users and a subset of fake users (pseudorandom by week)
+            # The CTE below mirrors the leaderboard logic
+            query = """
+            WITH week_seed AS (
+                SELECT EXTRACT(WEEK FROM NOW()) AS w
+            ),
+            eligible_users AS (
+                SELECT user_id, total_invites FROM users WHERE user_id > 0
+                UNION ALL
+                SELECT user_id, total_invites FROM users CROSS JOIN week_seed
+                WHERE user_id < 0 
+                  AND MOD(ABS(user_id) * week_seed.w::int, 100) < 30
+            )
+            SELECT COUNT(*)+1 AS rank 
+            FROM eligible_users 
+            WHERE total_invites > (SELECT COALESCE(total_invites, 0) FROM users WHERE user_id=$1)
+            """
+            row = await conn.fetchrow(query, user_id)
+        else:
+            row = await conn.fetchrow(
+                "SELECT COUNT(*)+1 AS rank FROM users WHERE user_id > 0 AND total_invites > "
+                "(SELECT total_invites FROM users WHERE user_id=$1)",
+                user_id
+            )
         return row["rank"]
 
 
@@ -257,16 +310,16 @@ async def claim_daily_bonus(user_id: int) -> tuple[bool, str, float]:
 async def get_all_user_ids() -> list[int]:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        rows = await conn.fetch("SELECT user_id FROM users WHERE banned=FALSE")
+        rows = await conn.fetch("SELECT user_id FROM users WHERE banned=FALSE AND user_id > 0")
         return [r["user_id"] for r in rows]
 
 
 async def get_stats() -> dict:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        total = await conn.fetchval("SELECT COUNT(*) FROM users")
-        active = await conn.fetchval("SELECT COUNT(*) FROM users WHERE tasks_done=TRUE")
-        total_paid = await conn.fetchval("SELECT COALESCE(SUM(balance),0) FROM users")
+        total = await conn.fetchval("SELECT COUNT(*) FROM users WHERE user_id > 0")
+        active = await conn.fetchval("SELECT COUNT(*) FROM users WHERE tasks_done=TRUE AND user_id > 0")
+        total_paid = await conn.fetchval("SELECT COALESCE(SUM(balance),0) FROM users WHERE user_id > 0")
         p_w = await conn.fetchval("SELECT COUNT(*) FROM withdrawals WHERE status='pending'")
         return {
             "total_users": total,
@@ -279,20 +332,49 @@ async def get_stats() -> dict:
 async def get_leaderboard(limit: int = 20) -> list[asyncpg.Record]:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        return await conn.fetch(
-            "SELECT user_id, full_name, total_invites, balance "
-            "FROM users ORDER BY total_invites DESC LIMIT $1",
-            limit
-        )
+        show_fake = await get_setting("show_fake_leaders", "1")
+        if show_fake == "1":
+            # Select real users + ~30% of fake users based on week hash
+            query = """
+            WITH week_seed AS (
+                SELECT EXTRACT(WEEK FROM NOW()) AS w
+            )
+            SELECT user_id, full_name, total_invites, balance 
+            FROM users CROSS JOIN week_seed
+            WHERE user_id > 0 
+               OR (user_id < 0 AND MOD(ABS(user_id) * week_seed.w::int, 100) < 30)
+            ORDER BY total_invites DESC LIMIT $1
+            """
+            return await conn.fetch(query, limit)
+        else:
+            return await conn.fetch(
+                "SELECT user_id, full_name, total_invites, balance "
+                "FROM users WHERE user_id > 0 ORDER BY total_invites DESC LIMIT $1",
+                limit
+            )
 
 async def get_earners_leaderboard(limit: int = 10) -> list[asyncpg.Record]:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        return await conn.fetch(
-            "SELECT user_id, full_name, total_invites, balance "
-            "FROM users ORDER BY balance DESC LIMIT $1",
-            limit
-        )
+        show_fake = await get_setting("show_fake_leaders", "1")
+        if show_fake == "1":
+            query = """
+            WITH week_seed AS (
+                SELECT EXTRACT(WEEK FROM NOW()) AS w
+            )
+            SELECT user_id, full_name, total_invites, balance 
+            FROM users CROSS JOIN week_seed
+            WHERE user_id > 0 
+               OR (user_id < 0 AND MOD(ABS(user_id) * week_seed.w::int, 100) < 30)
+            ORDER BY balance DESC LIMIT $1
+            """
+            return await conn.fetch(query, limit)
+        else:
+            return await conn.fetch(
+                "SELECT user_id, full_name, total_invites, balance "
+                "FROM users WHERE user_id > 0 ORDER BY balance DESC LIMIT $1",
+                limit
+            )
 
 
 async def get_user_history(user_id: int, limit: int = 15) -> list[asyncpg.Record]:

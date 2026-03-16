@@ -309,6 +309,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"  After: `{fmt_balance(rs)}`\n\n"
             f"Choose a setting to edit:"
         )
+        fake_label = "🟢 Fake Leaders: ON" if await db.get_setting("show_fake_leaders", "1") == "1" else "🔴 Fake Leaders: OFF"
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🎉 Signup Bonus", callback_data="adm:edit_set:signup_bonus")],
             [InlineKeyboardButton("📋 Task Reward", callback_data="adm:edit_set:task_reward")],
@@ -318,10 +319,19 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("👥 Ref Primary", callback_data="adm:edit_set:referral_reward_primary"),
              InlineKeyboardButton("👥 Ref Secondary", callback_data="adm:edit_set:referral_reward_secondary")],
             [InlineKeyboardButton("👥 Ref Threshold", callback_data="adm:edit_set:referral_reward_threshold")],
+            [InlineKeyboardButton(fake_label, callback_data="adm:toggle_fake")],
             [InlineKeyboardButton("⬅️ Back", callback_data="adm:back")]
         ])
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
         return ConversationHandler.END
+
+    elif data == "adm:toggle_fake":
+        current = await db.get_setting("show_fake_leaders", "1")
+        new_val = "0" if current == "1" else "1"
+        await db.set_setting("show_fake_leaders", new_val)
+        await query.answer(f"Fake leaders {'enabled' if new_val == '1' else 'disabled'}!")
+        query.data = "adm:settings"
+        return await admin_callback(update, context)
 
     elif data.startswith("adm:edit_set:"):
         key = data.split(":")[2]
