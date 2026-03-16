@@ -10,13 +10,13 @@ Stack: **Python 3.11 · python-telegram-bot 21 · asyncpg · PostgreSQL · Railw
 | Feature | Details |
 |---|---|
 | 🎉 Signup Bonus | New users receive a configurable bonus (default **$1.00**) on first `/start` |
-| 📋 Task Rewards | Each completed channel task pays a configurable reward (default **$0.50**) |
-| 👥 Referral Rewards | Referring a user earns a configurable bonus (default **$0.40**) once they finish all tasks |
-| 🎁 Daily Bonus | Users can claim a configurable daily bonus (default **$0.50**) — missed days cannot be retroactively claimed |
+| 📋 Task Rewards | Each completed channel task pays a configurable reward (default **$0.30**) |
+| 👥 Referral Rewards | **2-tier system** — first 5 referrals earn **$0.30** each, then **$0.05** each (all configurable from admin) |
+| 🎁 Daily Bonus | **2-tier system** — first 5 days earn **$0.20**, then **$0.02** (all configurable). Missed days cannot be reclaimed |
 | 📜 Earn/Referral History | Full transaction history with masked Telegram IDs for privacy |
 | 🏆 Leaderboard | Weekly invite rank + overall balance rank |
 | 💸 Withdrawals | TON (Crypto), USDT (Crypto), Telegram Stars, PayPal — admin review required |
-| 🔧 Admin Panel | Full management of tasks, withdrawals, broadcasts, and configurable reward amounts |
+| 🔧 Admin Panel | Full management of tasks, withdrawals, broadcasts, and **all 8 configurable reward settings** |
 
 ---
 
@@ -144,7 +144,22 @@ The bot must be an **admin** (with member visibility) in every channel/group you
 | 💸 Withdrawals | Review pending requests — Mark Paid or Reject with a reason |
 | 📢 Broadcast | Send a message to all users |
 | 📊 Full Stats | Total users, active users, balance owed, pending withdrawals, top earners |
-| ⚙️ Settings | Edit reward amounts (signup bonus, task reward, referral reward, daily bonus) |
+| ⚙️ Settings | Edit all 8 reward settings (see below) |
+
+### Configurable Settings (via Admin Panel)
+
+All reward amounts and tier thresholds are editable at runtime from the admin `⚙️ Settings` menu — no redeployment needed.
+
+| Setting | Default | Description |
+|---|---|---|
+| Signup Bonus | `$1.00` | One-time bonus when a new user joins |
+| Task Reward | `$0.30` | Per completed channel task |
+| Daily Bonus Primary | `$0.20` | Daily bonus for the first N claims |
+| Daily Bonus Secondary | `$0.02` | Daily bonus after threshold |
+| Daily Bonus Threshold | `5` | Number of days at the primary rate |
+| Referral Reward Primary | `$0.30` | Referral reward for the first N invites |
+| Referral Reward Secondary | `$0.05` | Referral reward after threshold |
+| Referral Reward Threshold | `5` | Number of referrals at the primary rate |
 
 ### Admin Privileges
 
@@ -163,10 +178,12 @@ Admins (any user ID listed in `ADMIN_IDS`) have special privileges:
 
 **Referral credits after tasks** — Prevents fake accounts from being created just to farm referral rewards. Referrer only earns once the referred user genuinely completes all tasks.
 
-**Daily bonus strict** — If a user misses claiming their daily bonus on a given day, that day's bonus cannot be claimed retroactively. This is by design to incentivize daily engagement.
+**2-tier reward decay** — Daily bonus and referral rewards use a tiered system: the first N claims/referrals pay a higher "primary" rate, after which users earn a lower "secondary" rate. This drives aggressive early sharing while making it hard to reach the withdrawal minimum without extensive referrals. All tier values and thresholds are editable from the admin panel.
 
-**Configurable amounts at runtime** — All reward amounts (signup, task, referral, daily) are stored in the `settings` DB table and editable from the admin panel without redeploying.
+**Daily bonus strict** — If a user misses claiming their daily bonus on a given day, that day's bonus cannot be claimed retroactively. This incentivizes daily engagement.
 
-**Withdrawal queue** — Withdrawals are stored as `pending` in the DB and must be manually approved by an admin. On rejection, balance is automatically refunded.
+**Configurable amounts at runtime** — All 8 reward settings (signup, task, daily primary/secondary/threshold, referral primary/secondary/threshold) are stored in the `settings` DB table and editable from the admin panel without redeploying.
+
+**Withdrawal queue** — Withdrawals are stored as `pending` in the DB and must be manually approved by an admin. On rejection, balance is automatically refunded and the user is notified with the rejection reason.
 
 **Parallel membership checks** — `core/ui.py:check_all_tasks()` uses `asyncio.gather()` to verify all channels simultaneously.
