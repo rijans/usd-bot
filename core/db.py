@@ -118,24 +118,55 @@ async def init_schema():
         import random
         fake_count = await conn.fetchval("SELECT COUNT(*) FROM users WHERE user_id < 0")
         if fake_count == 0:
-            first_names = ["Alex", "Jordan", "Taylor", "Casey", "Riley", "Jamie", "Avery", "Peyton", 
-                           "Cameron", "Parker", "Morgan", "Sam", "Drew", "Skyler", "Blake", "Charlie",
-                           "Logan", "Rowan", "Hayden", "Quinn", "Dylan", "Reese", "Kendall", "Dakota",
-                           "Micah", "Emerson", "Finley", "River", "Rory", "Sage", "Spencer", "Ariel",
-                           "Ellis", "Frankie", "Harley", "Marley", "Monroe", "Oakley", "Phoenix", "Remy",
-                           "Robin", "Shiloh", "Stevie", "Sutton", "Tatum", "Wilder", "Wren", "Amari",
-                           "Arden", "Bellamy"]
+            names = [
+                "🍷🌹™👉●×Hejran🌙🫧", "⚜༒🦋𝔖𝔞𝔯𝔞🦋༒⚜", "⌜JERRY TWO BOT⌟", "🌙🌙💦ད☘🏹🌙❤️Nadia ❤️🌙🎲", 
+                "🥀Yasmin 🇵🇸", "SangMata (beta)", "Luis Nano", "Harqaboobe", "Coco Rs", "El Ator", 
+                "39801 Pedro", "Miki Yema", "Adrian Adrian", "Gooni", "Diallo Oury", "eranda weeraratne", 
+                "Lionoftheyear 20", "Belal3mad", "Shshshsh Fjfjcjfjfj", "🇮🇷Rumi Zahara🦋 💖", 
+                "⌜✨🌿 Subhashini↔വീഡിയോക്കോൾ↔🌺", "Jax stuff Collection", "Aakanshi • கோயம்புத்தூர்", 
+                "Purnima Singh 💫", "Anjali...💋", "Rahul", "Priya❤️", "Ivan", "Anna🔥", "Dmitry", "Ahmed🇪🇬", 
+                "Fatima", "Aisha", "Muhammad", "Ayesha", "Bilal", "Youssef", "Mona", "Nguyen", "Tran🍓", 
+                "Budi", "Siti", "Silva", "Santos", "Kim", "Lee", "Park", "Alex", "Jordan", "Moon_light",
+                "Rozana", "Loula", "safia", "Rose", "Group Help", "Ⓜ️aqsuda 🍉📜📚🤲🏼", "Sizzle", 
+                "^=F A M O s §} {F A M O?", "/ !", "Nes", "Saray", "Ken Yow", "Sagar", "Galiya Shostakovich",
+                "Amelia", "Adi Dxb", "Liya", "Phancy Casey", "Atlas", "Meena Khan", "m a", "Mery Alex",
+                "Averse Ta", "Mehde Hassan", "Iron Man", "Lambozz", "Memkk", "Ganesh Hyderabad NSUI",
+                "Akith Ahsan", "Dark DEVIL🦅👑", "Edward Elric", "Dipro H", "Wasimkhan☪️☪️"
+            ]
             
-            # Simple seeded generation for initial stability
             rng = random.Random(42)
             
             for i in range(50):
                 uid = -1001 - i
-                name = rng.choice(first_names)
-                invites = rng.randint(50, 300)
-                # Give rough balance: $1 signup + $1.5 tasks + $1.5 daily + ~$10-30 referrals
-                bal = 4.0 + (invites * 0.1) + rng.uniform(-5.0, 10.0) 
-                bal = max(bal, 4.0)
+                name = rng.choice(names)
+                
+                # Pick an invite tier to simulate a power-law distribution
+                tier = rng.choices(
+                    population=["low", "mid", "high", "viral"], 
+                    weights=[0.60, 0.25, 0.10, 0.05], 
+                    k=1
+                )[0]
+                
+                if tier == "low":
+                    invites = rng.randint(50, 150)
+                elif tier == "mid":
+                    invites = rng.randint(151, 500)
+                elif tier == "high":
+                    invites = rng.randint(501, 2000)
+                else: # viral
+                    invites = rng.randint(2001, 8000)
+                    
+                # Calculate realistic balance matching our reward model 
+                # ($1 signup + ~$1.5 tasks + daily bonuses + tiered referral)
+                base_bal = 4.0 # signup + early tasks + couple daily
+                if invites <= 5:
+                    bal = base_bal + (invites * 0.30)
+                else:
+                    bal = base_bal + (5 * 0.30) + ((invites - 5) * 0.05)
+                
+                # Add a few random extra dollars for daily checkins/other tasks
+                bal += rng.uniform(0.0, 15.0)
+                bal = round(bal, 2)
                 
                 await conn.execute(
                     """INSERT INTO users (user_id, full_name, username, balance, total_invites, tasks_done)

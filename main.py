@@ -105,6 +105,15 @@ async def reply_kb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "💸 Withdraw":
         await nav_withdraw(update, context)
 
+async def cmd_reseed_fake(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    admin_ids = [int(x) for x in os.environ.get("ADMIN_IDS", "").split(",") if x.isdigit()]
+    if update.effective_user.id not in admin_ids:
+        return
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM users WHERE user_id < 0")
+    await db.init_schema()
+    await update.message.reply_text("✅ Fake users reseeded with new diverse names and higher stats!")
 
 def main():
     token = os.environ["BOT_TOKEN"]
@@ -124,6 +133,7 @@ def main():
     app.add_handler(CommandHandler("earnings", cmd_earnings))
     app.add_handler(CommandHandler("refer",    cmd_refer))
     app.add_handler(CommandHandler("share",    cmd_share))
+    app.add_handler(CommandHandler("reseed_fake", cmd_reseed_fake))
 
     # ── Inline nav buttons ────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(nav_start,    pattern="^nav:start$"))
