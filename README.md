@@ -19,7 +19,9 @@ Stack: **Python 3.12 · python-telegram-bot 21 (job-queue) · asyncpg · Postgre
 | 📢 Group Auto-Promoter | Group owners can add the bot to their groups and configure auto-posting of their referral link at a custom interval |
 | 📜 Transaction History | Full earning history with privacy-masked Telegram IDs |
 | 💸 Withdrawals | TON, USDT, Telegram Stars, PayPal — admin review + reject-with-reason + auto-refund |
-| 🔧 Admin Panel | Tasks, withdrawals, broadcast, full stats (**real users only**), and all configurable reward settings |
+| 🛡️ Support Tickets | Users can submit feedback/complaints via the FAQ menu. Admins review, reply via Push Notifications, and resolve in `/admin`. |
+| 🌍 Profile Countries | Users can select their real country (including sanctioned countries like Iran/Syria) which displays on their active profile. |
+| 🔧 Admin Panel | Tasks, withdrawals, broadcast, tickets, full stats (**real users only**), and all configurable reward settings |
 | 📊 Full Stats (Admin) | Accurate view of real user counts, balance owed, top inviters/earners — fake users fully excluded |
 
 ---
@@ -193,6 +195,9 @@ All reward amounts and thresholds are editable at runtime — no redeployment ne
 | `/admin` | Open admin panel |
 | `/reseed_fake` | Wipe and re-generate the 50 fake leaderboard users with new random stats |
 | `/test_daily_job` | Manually trigger the daily bonus reminder broadcast |
+| `/addbalance` | Give unearned balance to a specific user id (`/addbalance 12345 5.50`) |
+| `/deductbalance` | Revoke a specific user id's balance (`/deductbalance 12345 2.00`) |
+| `/setbalance` | Forcibly set a specific user id's balance to an exact amount (`/setbalance 12345 10.00`) |
 
 ### Admin Privileges
 
