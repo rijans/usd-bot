@@ -32,11 +32,11 @@ from handlers.admin import (
     cmd_admin, admin_callback, cancel, edit_setting_value,
     add_task_title, add_task_chat, add_task_link,
     edit_task_title, edit_task_chat, edit_task_link,
-    broadcast_text, wreject_reason_text,
+    broadcast_text, wreject_reason_text, lookup_user_text,
     ADD_TASK_TITLE, ADD_TASK_CHAT, ADD_TASK_LINK,
     BROADCAST_TEXT, EDIT_SETTING, WREJECT_REASON,
     EDIT_TASK_TITLE, EDIT_TASK_CHAT, EDIT_TASK_LINK,
-    admin_ids
+    LOOKUP_USER, admin_ids
 )
 from handlers.groups import nav_groups, group_callback
 
@@ -366,6 +366,7 @@ def main():
             EDIT_TASK_TITLE:  [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_task_title)],
             EDIT_TASK_CHAT:   [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_task_chat)],
             EDIT_TASK_LINK:   [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_task_link)],
+            LOOKUP_USER:      [MessageHandler(filters.TEXT & ~filters.COMMAND, lookup_user_text)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         per_message=False,

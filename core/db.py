@@ -389,11 +389,13 @@ async def get_stats() -> dict:
         active = await conn.fetchval("SELECT COUNT(*) FROM users WHERE tasks_done=TRUE AND user_id > 0")
         total_paid = await conn.fetchval("SELECT COALESCE(SUM(balance),0) FROM users WHERE user_id > 0")
         p_w = await conn.fetchval("SELECT COUNT(*) FROM withdrawals WHERE status='pending'")
+        profs = await conn.fetchval("SELECT COUNT(*) FROM user_profiles")
         return {
             "total_users": total,
             "active_users": active,
             "total_balance_owed": float(total_paid),
             "pending_withdrawals": p_w,
+            "profiles_setup": profs,
         }
 
 

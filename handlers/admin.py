@@ -22,6 +22,9 @@ from telegram.ext import ContextTypes, ConversationHandler, filters, MessageHand
 import core.db as db
 from core.ui import fmt_balance
 
+from handlers.groups import nav_groups, group_callback
+from handlers.profile import _profile_text
+
 # States
 ADD_TASK_TITLE  = 20
 ADD_TASK_CHAT   = 21
@@ -32,6 +35,7 @@ WREJECT_REASON  = 50
 EDIT_TASK_TITLE = 60
 EDIT_TASK_CHAT  = 61
 EDIT_TASK_LINK  = 62
+LOOKUP_USER     = 70
 
 
 def admin_ids() -> list[int]:
@@ -64,6 +68,7 @@ async def cmd_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔧 *Admin Panel*\n\n"
         f"👥 Total Users: *{stats['total_users']}*\n"
         f"✅ Active (tasks done): *{stats['active_users']}*\n"
+        f"📝 Profiles Configured: *{stats.get('profiles_setup', 0)}*\n"
         f"💰 Total Balance Owed: *{fmt_balance(stats['total_balance_owed'])}*\n"
         f"💸 Pending Withdrawals: *{stats['pending_withdrawals']}*\n"
     )
@@ -77,6 +82,7 @@ def _admin_keyboard():
         [InlineKeyboardButton("📋 Manage Tasks", callback_data="adm:tasks")],
         [InlineKeyboardButton("💸 Withdrawals", callback_data="adm:withdrawals")],
         [InlineKeyboardButton("📢 Broadcast", callback_data="adm:broadcast")],
+        [InlineKeyboardButton("🔍 Lookup User", callback_data="adm:lookup")],
         [InlineKeyboardButton("⚙️ Settings", callback_data="adm:settings")],
         [InlineKeyboardButton("📊 Full Stats", callback_data="adm:stats")],
     ])
@@ -259,6 +265,41 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return BROADCAST_TEXT
 
+    # ── Lookup User ───────────────────────────────────────────────────────────
+    elif data == "adm:lookup":
+        context.user_data["adm_prev_menu"] = "adm:back"
+        await query.edit_message_text(
+            "🔍 *Lookup User Profile*\n\n"
+            "Send the *Telegram User ID* (numbers only) to look up their profile.\n\n"
+            "_(Type /cancel to abort)_",
+            parse_mode="Markdown"
+        )
+        return LOOKUP_USER
+
+    # ── View Profile (read-only) ──────────────────────────────────────────────
+    elif data.startswith("adm:prof:"):
+        uid = int(data.split(":")[2])
+        user = await db.get_user(uid)
+        profile = await db.get_profile(uid)
+        if not user:
+            await query.answer("User not found.", show_alert=True)
+            return ConversationHandler.END
+
+        text = _profile_text(user, profile)
+        
+        # Determine back button based on context
+        prev = context.user_data.get("adm_prev_menu", "adm:withdrawals")
+        if data.endswith("_lookup"):
+            # if we came from lookup user, back goes to admin menu
+            prev = "adm:back"
+            
+        await query.edit_message_text(
+            text, parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data=prev)]])
+        )
+        return ConversationHandler.END
+
+
     # ── Full Stats ────────────────────────────────────────────────────────────
     elif data == "adm:stats":
         stats = await db.get_stats()
@@ -269,6 +310,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📊 *Full Statistics*\n\n"
             f"👥 Total Users: {stats['total_users']}\n"
             f"✅ Active (tasks done): {stats['active_users']}\n"
+            f"📝 Profiles Configured: {stats.get('profiles_setup', 0)}\n"
             f"💰 Total Balance Owed: {fmt_balance(stats['total_balance_owed'])}\n"
             f"💸 Pending Withdrawals: {stats['pending_withdrawals']}\n\n"
             f"🏆 *Top 10 Inviters:*\n"
@@ -372,6 +414,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🔧 *Admin Panel*\n\n"
             f"👥 Total Users: *{stats['total_users']}*\n"
             f"✅ Active: *{stats['active_users']}*\n"
+            f"📝 Profiles Configured: *{stats.get('profiles_setup', 0)}*\n"
             f"💸 Pending Withdrawals: *{stats['pending_withdrawals']}*\n"
         )
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=_admin_keyboard())
@@ -543,6 +586,28 @@ async def wreject_reason_text(update: Update, context: ContextTypes.DEFAULT_TYPE
         
     return ConversationHandler.END
 
+
+@require_admin
+async def lookup_user_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id_str = update.message.text.strip()
+    if not user_id_str.isdigit():
+        await update.message.reply_text("⚠️ User ID must be a number. Try again or /cancel:")
+        return LOOKUP_USER
+        
+    uid = int(user_id_str)
+    user = await db.get_user(uid)
+    if not user:
+        await update.message.reply_text("❌ User not found. Try another ID or /cancel:")
+        return LOOKUP_USER
+        
+    profile = await db.get_profile(uid)
+    text = _profile_text(user, profile)
+    await update.message.reply_text(
+        text, parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back to Admin Panel", callback_data="adm:back")]])
+    )
+    return ConversationHandler.END
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
@@ -570,7 +635,8 @@ async def _show_withdrawals(query):
             [
                 InlineKeyboardButton("✅ Mark Paid", callback_data=f"adm:wpay:{w['id']}"),
                 InlineKeyboardButton("❌ Reject", callback_data=f"adm:wreject:{w['id']}"),
-            ]
+            ],
+            [InlineKeyboardButton("👤 View Profile", callback_data=f"adm:prof:{w['user_id']}")]
         ])
         try:
             await query.message.reply_text(text, parse_mode="Markdown", reply_markup=keyboard)
