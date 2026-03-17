@@ -10,6 +10,7 @@ from telegram.ext import (
     ConversationHandler,
     ContextTypes,
     MessageHandler,
+    PreCheckoutQueryHandler,
     filters,
 )
 
@@ -27,6 +28,10 @@ from handlers.profile import (
 from handlers.withdraw import (
     nav_withdraw, pick_method, use_saved_address, enter_destination, cancel_withdraw,
     PICK_METHOD, ENTER_DEST, USE_SAVED,
+)
+from handlers.luckydraw import (
+    show_lucky_draw_menu, handle_buy_ticket_click, show_past_winners,
+    precheckout_callback, successful_payment_callback
 )
 from handlers.admin import (
     cmd_admin, admin_callback, cancel, edit_setting_value,
@@ -97,6 +102,51 @@ async def test_cleanup_job(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await cleanup_deleted_accounts(context)
     await update.message.reply_text("Cleanup complete.")
 
+async def finish_lucky_draw_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Cron job: Picks 3 fake users to win the draw and notifies all real participants."""
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        # 1. Randomly pick 3 fake users
+        # Fake users have user_id < 0. We order by random()
+        fake_pool = await conn.fetch("SELECT user_id FROM users WHERE user_id < 0 ORDER BY random() LIMIT 3")
+        if len(fake_pool) < 3:
+            log.warning("Not enough fake users to select Lucky Draw winners! Need 3.")
+            return
+
+        w1_id, w2_id, w3_id = fake_pool[0]["user_id"], fake_pool[1]["user_id"], fake_pool[2]["user_id"]
+
+        # 2. Record the winners
+        await db.set_today_lucky_draw_winners(w1_id, w2_id, w3_id)
+
+        # 3. Inform all REAL users who participated today
+        participants = await db.get_today_lucky_draw_participants()
+        
+        msg = (
+            "🎰 <b>Today's Lucky Draw has Concluded!</b> 🎰\n\n"
+            "The daily draw is officially over, and the top 3 winners have been finalized.\n"
+            "Thank you for participating today!\n\n"
+            "👇 Tap the button below to see the official winning list:"
+        )
+        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🎁 View Prize Winners", callback_data="ld:winners")]])
+        
+        count = 0
+        for uid in participants:
+            try:
+                await context.bot.send_message(uid, msg, reply_markup=keyboard, parse_mode="HTML")
+                count += 1
+                import asyncio
+                await asyncio.sleep(0.05)
+            except Exception:
+                pass
+                
+        log.info(f"Lucky Draw resolved. Notified {count} real participants.")
+
+async def test_draw_job(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_user.id not in admin_ids():
+        return
+    await update.message.reply_text("Triggering Lucky Draw midnight resolution cron job...")
+    await finish_lucky_draw_job(context)
+    await update.message.reply_text("Draw resolved and broadcasts sent.")
 
 async def on_bot_added(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Called when the bot joins a group — register the group for the user who added it."""
@@ -186,6 +236,11 @@ async def post_init(application: Application) -> None:
     )
     log.info("Weekly account cleanup scheduled (Sundays 03:00 UTC)")
 
+    # Schedule Lucky Draw winner selection every day at 23:58 UTC
+    ld_t = datetime.time(hour=23, minute=58, tzinfo=datetime.timezone.utc)
+    application.job_queue.run_daily(finish_lucky_draw_job, ld_t)
+    log.info(f"Daily Lucky Draw resolution scheduled at {ld_t} UTC")
+
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     err = context.error
@@ -253,6 +308,8 @@ async def reply_kb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await nav_withdraw(update, context)
     elif text == "👤 Profile":
         await nav_profile(update, context)
+    elif text == "🎰 Lucky Draw":
+        await show_lucky_draw_menu(update, context)
 
 async def cmd_reseed_fake(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in admin_ids():
@@ -284,6 +341,7 @@ def main():
     app.add_handler(CommandHandler("reseed_fake", cmd_reseed_fake))
     app.add_handler(CommandHandler("test_daily_job", test_daily_job))
     app.add_handler(CommandHandler("test_cleanup", test_cleanup_job))
+    app.add_handler(CommandHandler("test_draw_job", test_draw_job))
     app.add_handler(CommandHandler("profile", nav_profile))
     app.add_handler(CommandHandler("mygroups", nav_groups))
     
@@ -317,6 +375,13 @@ def main():
         per_message=False,
     )
     app.add_handler(ticket_conv)
+
+    # ── Lucky Draw Callbacks & Payments ──────────────────────────────────────
+    app.add_handler(CallbackQueryHandler(show_lucky_draw_menu, pattern="^nav:luckydraw$"))
+    app.add_handler(CallbackQueryHandler(handle_buy_ticket_click, pattern="^ld:buy:"))
+    app.add_handler(CallbackQueryHandler(show_past_winners, pattern="^ld:winners$"))
+    app.add_handler(PreCheckoutQueryHandler(precheckout_callback))
+    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
 
     # ── Group callback ────────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(nav_groups,     pattern="^nav:groups$"))
@@ -403,7 +468,7 @@ def main():
     # Must be registered AFTER ConversationHandlers so it doesn't
     # intercept messages meant for conversation steps.
     KEYBOARD_FILTER = filters.Regex(
-        r"^(🏠 Home|📋 Tasks|💰 Earnings|🤝 Refer & Earn|❓ FAQ & Support|❓ FAQ|💸 Withdraw|👤 Profile)$"
+        r"^(🏠 Home|📋 Tasks|💰 Earnings|🤝 Refer & Earn|❓ FAQ & Support|❓ FAQ|💸 Withdraw|👤 Profile|🎰 Lucky Draw)$"
     )
     app.add_handler(MessageHandler(filters.TEXT & KEYBOARD_FILTER, reply_kb_handler))
 

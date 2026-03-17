@@ -121,6 +121,23 @@ CREATE TABLE IF NOT EXISTS tickets (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS lucky_draw_entries (
+    id              SERIAL      PRIMARY KEY,
+    user_id         BIGINT      NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    stars_paid      INT         NOT NULL,
+    draw_date       DATE        NOT NULL DEFAULT CURRENT_DATE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS lucky_draw_winners (
+    id              SERIAL      PRIMARY KEY,
+    draw_date       DATE        NOT NULL UNIQUE DEFAULT CURRENT_DATE,
+    winner_1_id     BIGINT      NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    winner_2_id     BIGINT      NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    winner_3_id     BIGINT      NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 """
 
 async def init_schema():
@@ -939,3 +956,65 @@ async def delete_user(user_id: int) -> None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute("DELETE FROM users WHERE user_id=$1", user_id)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Lucky Draw
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def add_lucky_draw_entry(user_id: int, stars_paid: int) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO lucky_draw_entries (user_id, stars_paid) VALUES ($1, $2)",
+            user_id, stars_paid
+        )
+
+async def has_user_entered_today(user_id: int) -> bool:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        count = await conn.fetchval(
+            "SELECT COUNT(*) FROM lucky_draw_entries WHERE user_id=$1 AND draw_date=CURRENT_DATE",
+            user_id
+        )
+        return count > 0
+
+async def get_today_lucky_draw_entries_count() -> int:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchval("SELECT COUNT(*) FROM lucky_draw_entries WHERE draw_date=CURRENT_DATE")
+
+async def get_today_lucky_draw_participants() -> list[int]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        records = await conn.fetch("SELECT DISTINCT user_id FROM lucky_draw_entries WHERE draw_date=CURRENT_DATE")
+        return [r["user_id"] for r in records]
+
+async def set_today_lucky_draw_winners(w1: int, w2: int, w3: int) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """INSERT INTO lucky_draw_winners (draw_date, winner_1_id, winner_2_id, winner_3_id) 
+               VALUES (CURRENT_DATE, $1, $2, $3)
+               ON CONFLICT (draw_date) DO UPDATE 
+               SET winner_1_id=EXCLUDED.winner_1_id, 
+                   winner_2_id=EXCLUDED.winner_2_id, 
+                   winner_3_id=EXCLUDED.winner_3_id""",
+            w1, w2, w3
+        )
+
+async def get_past_lucky_draw_winners(limit: int = 5) -> list[asyncpg.Record]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetch(
+            """SELECT 
+                 w.draw_date,
+                 u1.full_name as w1_name, u1.username as w1_uname,
+                 u2.full_name as w2_name, u2.username as w2_uname,
+                 u3.full_name as w3_name, u3.username as w3_uname
+               FROM lucky_draw_winners w
+               JOIN users u1 ON w.winner_1_id = u1.user_id
+               JOIN users u2 ON w.winner_2_id = u2.user_id
+               JOIN users u3 ON w.winner_3_id = u3.user_id
+               ORDER BY w.draw_date DESC LIMIT $1""",
+            limit
+        )

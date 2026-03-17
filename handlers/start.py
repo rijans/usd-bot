@@ -13,13 +13,13 @@ from core.ui import nav_keyboard, BOT_NAME, fmt_balance
 # This is what users see pinned at the bottom like in the screenshot
 REPLY_KEYBOARD = ReplyKeyboardMarkup(
     [
-        [KeyboardButton("💰 Earnings"),       KeyboardButton("📋 Tasks")],
-        [KeyboardButton("🤝 Refer & Earn"),   KeyboardButton("❓ FAQ & Support")],
-        [KeyboardButton("💸 Withdraw"),       KeyboardButton("👤 Profile")],
-        [KeyboardButton("🏠 Home")],
+        ["📋 Tasks", "💰 Earnings"],
+        ["🤝 Refer & Earn", "💸 Withdraw"],
+        ["🎰 Lucky Draw"],
+        ["👤 Profile", "❓ FAQ & Support"]
     ],
     resize_keyboard=True,
-    input_field_placeholder="Choose an option or type a command...",
+    is_persistent=True
 )
 
 

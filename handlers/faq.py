@@ -12,12 +12,13 @@ TICKET_WRITE = 60  # Waiting for user to type their complaint/feedback
 
 
 FAQ_SECTIONS = [
-    ("faq:earning",   "💰 How do I earn?"),
-    ("faq:daily",     "🎁 Daily Bonus"),
-    ("faq:refer",     "🤝 Referrals & Invites"),
-    ("faq:withdraw",  "💸 Withdrawals"),
+    ("faq:earning",     "💰 How do I earn?"),
+    ("faq:daily",       "🎁 Daily Bonus"),
+    ("faq:refer",       "🤝 Referrals & Invites"),
+    ("faq:withdraw",    "💸 Withdrawals"),
     ("faq:leaderboard", "🏆 Leaderboard & Prizes"),
-    ("faq:groups",    "📢 Auto Promote in Group"),
+    ("faq:luckydraw",   "🎰 Lucky Draw Rules"),
+    ("faq:groups",      "📢 Auto Promote in Group"),
 ]
 
 FAQ_CONTENT = {
@@ -83,6 +84,17 @@ FAQ_CONTENT = {
         "• Share your referral link in groups, social media, and with friends\n"
         "• Every verified invite counts toward your weekly rank\n\n"
         "📊 You can see your current rank in 💰 Earnings."
+        " You can view the full top 50 in the 🏆 Leaderboard menu."
+    ),
+    "faq:luckydraw": (
+         "🎰 <b>Lucky Draw Rules</b>\n\n"
+         "Every day, we host an active Lucky Draw where 3 winners are randomly selected at midnight (UTC).\n\n"
+         "🥇 <b>1st Place:</b> $200 USD\n"
+         "🥈 <b>2nd Place:</b> $70 USD\n"
+         "🥉 <b>3rd Place:</b> $30 USD\n\n"
+         "🎫 <b>How to Enter:</b>\n"
+         "Tap 🎰 Lucky Draw to purchase a ticket slot. Tickets can be bought using Telegram Stars (50, 100, 150, or 300 ⭐️).\n\n"
+         "⚠️ <i>Please note: Participate at your own luck! Telegram Stars used to purchase entries are non-refundable.</i>"
     ),
     "faq:groups": (
         "📢 *Group Auto-Promoter*\n\n"

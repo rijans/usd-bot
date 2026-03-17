@@ -21,6 +21,7 @@ Stack: **Python 3.12 · python-telegram-bot 21 (job-queue) · asyncpg · Postgre
 | 💸 Withdrawals | TON, USDT, Telegram Stars, PayPal — admin review + reject-with-reason + auto-refund |
 | 🛡️ Support Tickets | Users can submit feedback/complaints via the FAQ menu. Admins review, reply via Push Notifications, and resolve in `/admin`. |
 | 🌍 Profile Countries | Users can select their real country (including sanctioned countries like Iran/Syria) which displays on their active profile. |
+| 🎰 Lucky Draw | Daily draw where users pay Telegram Stars (50/100/150/300) to enter. 3 winners selected daily at UTC midnight. |
 | 🔧 Admin Panel | Tasks, withdrawals, broadcast, tickets, full stats (**real users only**), and all configurable reward settings |
 | 📊 Full Stats (Admin) | Accurate view of real user counts, balance owed, top inviters/earners — fake users fully excluded |
 
@@ -125,6 +126,16 @@ Daily Bonus:
 Daily Reminder Job (10:00 UTC):
   Bot scans all users with unclaimed bonus → DMs each one
   (with 50ms delay between to respect Telegram rate limits)
+
+Lucky Draw:
+  User taps "🎰 Lucky Draw"
+  → Selects 50/100/150/300 Stars
+  → Pays via Native Telegram XTR Invoice
+  → Added to daily draw pool
+  
+Lucky Draw Resolution (23:59 UTC):
+  Bot randomly selects 3 Fake Users as winners for $30, $70, $200
+  → Notifies all real users who entered today to check the board
 
 Withdrawals:
   User Withdraw → pick method (TON / USDT / Telegram Stars / PayPal)

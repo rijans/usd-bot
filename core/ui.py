@@ -17,26 +17,17 @@ BOT_NAME     = os.environ.get("BOT_NAME",     "Dollar Earning Crypto Bot")
 # Main navigation keyboard (bottom of most screens)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def nav_keyboard(extra: list[list[InlineKeyboardButton]] = None) -> InlineKeyboardMarkup:
-    rows = [
-        [
-            InlineKeyboardButton("📋 Tasks",         callback_data="nav:tasks"),
-            InlineKeyboardButton("🤝 Refer & Earn", callback_data="nav:refer"),
-        ],
-        [
-            InlineKeyboardButton("💰 Earnings",      callback_data="nav:earnings"),
-            InlineKeyboardButton("💸 Withdraw",      callback_data="nav:withdraw"),
-        ],
-        [
-            InlineKeyboardButton("👤 Profile",      callback_data="nav:profile"),
-            InlineKeyboardButton("❓ FAQ & Support",  callback_data="nav:faq"),
-        ],
-        [
-            InlineKeyboardButton("👥 For Group Owners", callback_data="nav:groups"),
-        ],
+def nav_keyboard(include_admin: bool = False, include_groups: bool = False) -> InlineKeyboardMarkup:
+    """Shared inline navigation keyboard for main app sections."""
+    buttons = [
+        [InlineKeyboardButton("📋 Tasks", callback_data="nav:tasks"),
+         InlineKeyboardButton("💰 Earnings", callback_data="nav:earnings")],
+        [InlineKeyboardButton("🤝 Refer & Earn", callback_data="nav:refer"),
+         InlineKeyboardButton("💸 Withdraw", callback_data="nav:withdraw")],
+        [InlineKeyboardButton("🎰 Lucky Draw", callback_data="nav:luckydraw")],
+        [InlineKeyboardButton("👤 Profile", callback_data="nav:profile"),
+         InlineKeyboardButton("❓ FAQ & Support", callback_data="nav:faq")],
     ]
-    if extra:
-        rows = extra + rows
     return InlineKeyboardMarkup(rows)
 
 
