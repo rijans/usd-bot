@@ -21,8 +21,8 @@ Stack: **Python 3.12 · python-telegram-bot 21 (job-queue) · asyncpg · Postgre
 | 💸 Withdrawals | TON, USDT, Telegram Stars, PayPal — admin review + reject-with-reason + auto-refund |
 | 🛡️ Support Tickets | Users can submit feedback/complaints via the FAQ menu. Admins review, reply via Push Notifications, and resolve in `/admin`. |
 | 🌍 Profile Countries | Users can select their real country (including sanctioned countries like Iran/Syria) which displays on their active profile. |
-| 🎰 Lucky Draw | Daily draw where users pay Telegram Stars (50/100/150/300) to enter. 3 winners selected daily at UTC midnight. |
-| 🔧 Admin Panel | Tasks, withdrawals, broadcast, tickets, full stats (**real users only**), and all configurable reward settings |
+| 🎰 Lucky Draw | Daily draw where users pay Telegram Stars (50/100/150/300) to enter. 3 fake users always win; prize amounts ($200/$70/$30) are **admin-configurable**. |
+| 🔧 Admin Panel | Tasks, withdrawals, broadcast, tickets, **Lucky Draw stats + buyer history**, full stats (**real users only**), and all configurable reward settings |
 | 📊 Full Stats (Admin) | Accurate view of real user counts, balance owed, top inviters/earners — fake users fully excluded |
 
 ---
@@ -41,6 +41,9 @@ usd-bot/
 │   ├── earnings.py           # Balance, daily bonus, leaderboard, history
 │   ├── referral.py           # Share + Refer screens (invite link + stats)
 │   ├── withdraw.py           # Withdrawal ConversationHandler
+│   ├── luckydraw.py          # Lucky Draw entry (Telegram Stars XTR billing) + winners display
+│   ├── faq.py                # FAQ & Support + ticket submission ConversationHandler
+│   ├── profile.py            # User profile + country selection
 │   ├── admin.py              # /admin panel ConversationHandler
 │   └── groups.py             # Group Owner Auto-Promoter settings UI
 ├── requirements.txt
