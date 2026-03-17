@@ -87,7 +87,7 @@ async def nav_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not groups:
         text = (
-            "📢 *Group Auto-Promoter*\n\n"
+            "👥 *For Group Owners*\n\n"
             "You have no groups registered yet.\n\n"
             "To get started:\n"
             "1️⃣ Add the bot to your Telegram group\n"
@@ -98,7 +98,7 @@ async def nav_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
         markup = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="nav:start")]])
     else:
         text = (
-            f"📢 *Group Auto-Promoter*\n\n"
+            f"👥 *For Group Owners*\n\n"
             f"You have *{len(groups)}* group(s) registered.\n"
             f"Tap a group below to configure its auto-post settings.\n\n"
             f"🟢 = Active  |  🔴 = Paused"
