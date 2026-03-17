@@ -2,6 +2,7 @@ import logging
 import random
 import datetime
 from telegram import Update, LabeledPrice, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from core.db import (
@@ -82,7 +83,11 @@ async def show_lucky_draw_menu(update: Update, context: ContextTypes.DEFAULT_TYP
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if update.callback_query:
-        await update.callback_query.answer()
+        query = update.callback_query
+        try:
+            await query.answer()
+        except BadRequest:
+            pass
         await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
     else:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="HTML")
@@ -91,7 +96,10 @@ async def show_lucky_draw_menu(update: Update, context: ContextTypes.DEFAULT_TYP
 async def handle_buy_ticket_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sends a Telegram Stars invoice to the user."""
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except BadRequest:
+        pass
 
     stars_str = query.data.split(":")[-1]
     stars = int(stars_str)
@@ -154,7 +162,10 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
 
 async def show_past_winners(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except BadRequest:
+        pass
     
     winners = await get_past_lucky_draw_winners(limit=5)
     

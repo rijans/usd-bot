@@ -260,9 +260,18 @@ async def post_init(application: Application) -> None:
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     err = context.error
-    if isinstance(err, BadRequest) and "Message is not modified" in str(err):
-        return
+    err_str = str(err)
+
+    # Filter out noisy, harmless errors
+    if isinstance(err, BadRequest):
+        if "Message is not modified" in err_str: return
+        if "Query is too old" in err_str: return
+        if "id is invalid" in err_str: return
         
+    if "ReadError" in err_str or "timeout expired" in err_str:
+        log.warning(f"Network issue (Read/Timeout): {err_str}")
+        return
+
     if isinstance(err, Conflict):
         log.warning("Conflict error detected - this is normal during bot restart/deployment.")
         return
@@ -343,6 +352,8 @@ def main():
         Application.builder()
         .token(token)
         .post_init(post_init)
+        .read_timeout(30)
+        .connect_timeout(30)
         .build()
     )
 

@@ -2,6 +2,7 @@
 handlers/earnings.py  ─  Earnings screen: balance, daily bonus, leaderboard.
 """
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 from datetime import date
 
@@ -26,7 +27,10 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     if query:
-        await query.answer()
+        try:
+            await query.answer()
+        except BadRequest:
+            pass
 
     user = await db.get_user(user_id)
     if not user:
@@ -58,6 +62,7 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📊 Overall Rank: *#{rank}*\n"
         f"🏆 Weekly Invite Rank: *#{weekly_rank}*\n"
         f"👥 Total Invites: *{user['total_invites']}*\n\n"
+        f"🎰 *Daily Lucky Draw:* Enter to win big cash prizes! ($200/$70/$30)\n\n"
     )
 
     if not user["tasks_done"]:
@@ -80,6 +85,7 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buttons = []
         if daily_available:
             buttons.append([InlineKeyboardButton("🎁 Claim Daily Bonus", callback_data="earnings:daily")])
+        buttons.append([InlineKeyboardButton("🎰 Play Lucky Draw", callback_data="nav:luckydraw")])
         buttons.append([InlineKeyboardButton("🏆 Full Leaderboard", callback_data="earnings:leaderboard")])
         buttons.append([InlineKeyboardButton("📜 Full History", callback_data="earnings:history")])
         buttons.append([InlineKeyboardButton("👥 Invite & Earn More", callback_data="nav:refer")])

@@ -60,7 +60,10 @@ async def nav_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Handle both inline callback and reply keyboard text
     if update.callback_query:
         query = update.callback_query
-        await query.answer()
+        try:
+            await query.answer()
+        except BadRequest:
+            pass
         record = await db.get_user(query.from_user.id)
         if not record:
             record, _, _ = await db.upsert_user(
