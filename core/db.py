@@ -88,6 +88,15 @@ CREATE TABLE IF NOT EXISTS settings (
     key             TEXT        PRIMARY KEY,
     value           TEXT        NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS promoted_groups (
+    chat_id         BIGINT      PRIMARY KEY,
+    title           TEXT        NOT NULL DEFAULT '',
+    owner_id        BIGINT      NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    interval_hours  INT         NOT NULL DEFAULT 1,
+    active          BOOLEAN     NOT NULL DEFAULT TRUE,
+    last_posted_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 """
 
 async def init_schema():
@@ -639,6 +648,93 @@ async def get_pending_withdrawals() -> list[asyncpg.Record]:
             """SELECT w.*, u.full_name FROM withdrawals w
                JOIN users u ON w.user_id=u.user_id
                WHERE w.status='pending' ORDER BY w.requested_at ASC"""
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Promoted Groups
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def upsert_group(chat_id: int, title: str, owner_id: int) -> asyncpg.Record:
+    """Register or update a promoted group."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchrow(
+            """
+            INSERT INTO promoted_groups (chat_id, title, owner_id)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (chat_id) DO UPDATE
+                SET title=$2, owner_id=$3
+            RETURNING *
+            """,
+            chat_id, title, owner_id
+        )
+
+
+async def get_groups_by_owner(owner_id: int) -> list[asyncpg.Record]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetch(
+            "SELECT * FROM promoted_groups WHERE owner_id=$1 ORDER BY chat_id",
+            owner_id
+        )
+
+
+async def get_group(chat_id: int) -> Optional[asyncpg.Record]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchrow(
+            "SELECT * FROM promoted_groups WHERE chat_id=$1", chat_id
+        )
+
+
+async def update_group_interval(chat_id: int, interval_hours: int) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE promoted_groups SET interval_hours=$2 WHERE chat_id=$1",
+            chat_id, interval_hours
+        )
+
+
+async def toggle_group(chat_id: int) -> Optional[asyncpg.Record]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchrow(
+            "UPDATE promoted_groups SET active=NOT active WHERE chat_id=$1 RETURNING *",
+            chat_id
+        )
+
+
+async def delete_group(chat_id: int) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM promoted_groups WHERE chat_id=$1", chat_id
+        )
+
+
+async def get_groups_due_for_promotion() -> list[asyncpg.Record]:
+    """Return all active groups where it's time to post again."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetch(
+            """
+            SELECT pg.*, u.user_id AS u_id
+            FROM promoted_groups pg
+            JOIN users u ON pg.owner_id = u.user_id
+            WHERE pg.active = TRUE
+              AND pg.last_posted_at + (pg.interval_hours * INTERVAL '1 hour') <= NOW()
+            """
+        )
+
+
+async def mark_group_posted(chat_id: int) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE promoted_groups SET last_posted_at=NOW() WHERE chat_id=$1",
+            chat_id
         )
 
 

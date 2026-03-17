@@ -31,6 +31,9 @@ def nav_keyboard(extra: list[list[InlineKeyboardButton]] = None) -> InlineKeyboa
             InlineKeyboardButton("👥 Refer",     callback_data="nav:refer"),
             InlineKeyboardButton("💸 Withdraw",  callback_data="nav:withdraw"),
         ],
+        [
+            InlineKeyboardButton("📢 My Groups", callback_data="nav:groups"),
+        ],
     ]
     if extra:
         rows = extra + rows

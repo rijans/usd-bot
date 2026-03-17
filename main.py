@@ -32,6 +32,7 @@ from handlers.admin import (
     EDIT_TASK_TITLE, EDIT_TASK_CHAT, EDIT_TASK_LINK,
     admin_ids
 )
+from handlers.groups import nav_groups, group_callback
 
 logging.basicConfig(
     format="%(asctime)s  %(levelname)-8s  %(name)s - %(message)s",
@@ -61,6 +62,72 @@ async def test_daily_job(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_text("Broadcast complete.")
 
 
+async def on_bot_added(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Called when the bot joins a group — register the group for the user who added it."""
+    for member in update.message.new_chat_members:
+        if member.id == context.bot.id:
+            # The user who added the bot
+            adder = update.effective_user
+            chat = update.effective_chat
+            if not adder:
+                return
+            # Make sure adder is in our users table first
+            user = await db.get_user(adder.id)
+            if not user:
+                return  # Bot was added by a non-registered user; skip
+            title = chat.title or f"Group {chat.id}"
+            await db.upsert_group(chat.id, title, adder.id)
+            log.info(f"Group {chat.id} ({title}) registered by user {adder.id}")
+            try:
+                await context.bot.send_message(
+                    adder.id,
+                    f"✅ *Bot added to group!*\n\n"
+                    f"Your group *{title}* is now registered.\n"
+                    f"The bot will automatically post your referral link in the group."
+                    f"\n\nTap *📢 My Groups* in your private chat to configure the posting interval.",
+                    parse_mode="Markdown",
+                )
+            except Exception:
+                pass
+
+
+async def on_bot_removed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Called when the bot is kicked from a group — remove its registration."""
+    if update.message.left_chat_member and update.message.left_chat_member.id == context.bot.id:
+        chat_id = update.effective_chat.id
+        await db.delete_group(chat_id)
+        log.info(f"Group {chat_id} removed (bot was kicked)")
+
+
+async def auto_promote_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Runs every 5 minutes. Posts referral links in due groups."""
+    import asyncio
+    from core.ui import invite_link as build_invite_link, BOT_USERNAME
+    groups = await db.get_groups_due_for_promotion()
+    for g in groups:
+        owner_id = g["owner_id"]
+        link = build_invite_link(owner_id)
+        text = (
+            f"💰 *Earn Real Money on Telegram!*\n\n"
+            f"Join using the link below and start earning immediately:"
+            f"\n\n🔗 {link}\n\n"
+            f"✅ Get ${'{:.2f}'.format(1.00)} welcome bonus\n"
+            f"📋 Complete simple tasks\n"
+            f"👥 Invite friends & earn more\n"
+            f"💸 Withdraw via TON, USDT, PayPal & more"
+        )
+        try:
+            await context.bot.send_message(g["chat_id"], text, parse_mode="Markdown")
+            await db.mark_group_posted(g["chat_id"])
+        except Exception as e:
+            log.warning(f"Failed to post to group {g['chat_id']}: {e}")
+            # If bot kicked or group deleted, clean up
+            err_str = str(e).lower()
+            if "kicked" in err_str or "chat not found" in err_str or "bot was blocked" in err_str:
+                await db.delete_group(g["chat_id"])
+        await asyncio.sleep(0.1)  # avoid rate limits
+
+
 async def post_init(application: Application) -> None:
     await db.init_schema()
     log.info("DB schema ready.")
@@ -70,6 +137,10 @@ async def post_init(application: Application) -> None:
     t = datetime.time(hour=10, minute=0, tzinfo=datetime.timezone.utc)
     application.job_queue.run_daily(daily_bonus_reminder, t)
     log.info(f"Daily job scheduled at {t} UTC")
+
+    # Schedule group auto-promotion check every 5 minutes
+    application.job_queue.run_repeating(auto_promote_job, interval=300, first=60)
+    log.info("Group auto-promoter job scheduled (every 5 min)")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -166,6 +237,7 @@ def main():
     app.add_handler(CommandHandler("share",    cmd_share))
     app.add_handler(CommandHandler("reseed_fake", cmd_reseed_fake))
     app.add_handler(CommandHandler("test_daily_job", test_daily_job))
+    app.add_handler(CommandHandler("mygroups", nav_groups))
 
     # ── Inline nav buttons ────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(nav_start,    pattern="^nav:start$"))
@@ -173,6 +245,14 @@ def main():
     app.add_handler(CallbackQueryHandler(nav_share,    pattern="^nav:share$"))
     app.add_handler(CallbackQueryHandler(nav_earnings, pattern="^nav:earnings$"))
     app.add_handler(CallbackQueryHandler(nav_refer,    pattern="^nav:refer$"))
+
+    # ── Group callback ────────────────────────────────────────────────────────
+    app.add_handler(CallbackQueryHandler(nav_groups,     pattern="^nav:groups$"))
+    app.add_handler(CallbackQueryHandler(group_callback, pattern="^grp:"))
+
+    # ── Group status update handlers ──────────────────────────────────────────
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_bot_added))
+    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, on_bot_removed))
 
     # ── Task callbacks ────────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(task_view,   pattern="^task:view:[0-9]+$"))
