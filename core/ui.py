@@ -28,7 +28,7 @@ def nav_keyboard(include_admin: bool = False, include_groups: bool = False) -> I
         [InlineKeyboardButton("👤 Profile", callback_data="nav:profile"),
          InlineKeyboardButton("❓ FAQ & Support", callback_data="nav:faq")],
     ]
-    return InlineKeyboardMarkup(rows)
+    return InlineKeyboardMarkup(buttons)
 
 
 def back_keyboard(target: str = "nav:start") -> InlineKeyboardMarkup:
