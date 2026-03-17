@@ -118,16 +118,10 @@ async def _send_home(update: Update, record, is_new=False):
             f"💸 *Withdraw via:* TON · USDT · Telegram Stars · PayPal"
         )
 
-    # Send with BOTH the inline nav keyboard (on the message) AND
-    # the persistent reply keyboard (pinned at bottom of screen)
+    # Send both the reply keyboard (persistent bottom bar) and the inline
+    # nav keyboard attached to the same big message — wide text = wide buttons!
     await update.message.reply_text(
         text,
-        parse_mode="Markdown",
-        reply_markup=REPLY_KEYBOARD,   # Sets the persistent bottom keyboard
-    )
-    # Then send the inline nav as a second message
-    await update.message.reply_text(
-        "👇 *Quick Navigation:*",
         parse_mode="Markdown",
         reply_markup=nav_keyboard(),
     )
