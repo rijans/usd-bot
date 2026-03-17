@@ -750,3 +750,97 @@ async def edit_task_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back to Task", callback_data=f"adm:task_detail:{task_id}")]])
     )
     return ConversationHandler.END
+
+
+# ── Balance Adjustments ───────────────────────────────────────────────────────
+
+@require_admin
+async def cmd_addbalance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    args = context.args
+    if len(args) != 2:
+        await update.message.reply_text("Usage: `/addbalance <user_id> <amount>`", parse_mode="Markdown")
+        return
+    try:
+        user_id = int(args[0])
+        amount = float(args[1])
+    except ValueError:
+        await update.message.reply_text("Invalid arguments.")
+        return
+
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        user = await conn.fetchrow("SELECT balance FROM users WHERE user_id=$1", user_id)
+        if not user:
+            await update.message.reply_text("User not found.")
+            return
+        await db.add_balance(user_id, amount, conn)
+        # Record transaction for history
+        await conn.execute(
+            "INSERT INTO transactions (user_id, amount, type) VALUES ($1, $2, 'admin_bonus')",
+            user_id, amount
+        )
+        new_user = await conn.fetchrow("SELECT balance FROM users WHERE user_id=$1", user_id)
+
+    await update.message.reply_text(f"✅ Added *${amount:.2f}* to user {user_id}.\nNew balance: *${new_user['balance']:.2f}*", parse_mode="Markdown")
+
+
+@require_admin
+async def cmd_deductbalance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    args = context.args
+    if len(args) != 2:
+        await update.message.reply_text("Usage: `/deductbalance <user_id> <amount>`", parse_mode="Markdown")
+        return
+    try:
+        user_id = int(args[0])
+        amount = float(args[1])
+    except ValueError:
+        await update.message.reply_text("Invalid arguments.")
+        return
+
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        user = await conn.fetchrow("SELECT balance FROM users WHERE user_id=$1", user_id)
+        if not user:
+            await update.message.reply_text("User not found.")
+            return
+        await db.add_balance(user_id, -amount, conn)
+        await conn.execute(
+            "INSERT INTO transactions (user_id, amount, type) VALUES ($1, $2, 'admin_deduct')",
+            user_id, -amount
+        )
+        new_user = await conn.fetchrow("SELECT balance FROM users WHERE user_id=$1", user_id)
+
+    await update.message.reply_text(f"✅ Deducted *${amount:.2f}* from user {user_id}.\nNew balance: *${new_user['balance']:.2f}*", parse_mode="Markdown")
+
+
+@require_admin
+async def cmd_setbalance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    args = context.args
+    if len(args) != 2:
+        await update.message.reply_text("Usage: `/setbalance <user_id> <amount>`", parse_mode="Markdown")
+        return
+    try:
+        user_id = int(args[0])
+        amount = float(args[1])
+    except ValueError:
+        await update.message.reply_text("Invalid arguments.")
+        return
+
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        user = await conn.fetchrow("SELECT balance FROM users WHERE user_id=$1", user_id)
+        if not user:
+            await update.message.reply_text("User not found.")
+            return
+            
+        old_balance = user['balance']
+        diff = amount - float(old_balance)
+        
+        await conn.execute("UPDATE users SET balance=$2 WHERE user_id=$1", user_id, amount)
+        await conn.execute(
+            "INSERT INTO transactions (user_id, amount, type) VALUES ($1, $2, 'admin_set')",
+            user_id, diff
+        )
+        new_user = await conn.fetchrow("SELECT balance FROM users WHERE user_id=$1", user_id)
+
+    await update.message.reply_text(f"✅ Set balance of user {user_id} to *${amount:.2f}*.\nOld balance: *${old_balance:.2f}*", parse_mode="Markdown")

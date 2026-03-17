@@ -36,7 +36,8 @@ from handlers.admin import (
     ADD_TASK_TITLE, ADD_TASK_CHAT, ADD_TASK_LINK,
     BROADCAST_TEXT, EDIT_SETTING, WREJECT_REASON,
     EDIT_TASK_TITLE, EDIT_TASK_CHAT, EDIT_TASK_LINK,
-    LOOKUP_USER, admin_ids
+    LOOKUP_USER, admin_ids,
+    cmd_addbalance, cmd_deductbalance, cmd_setbalance
 )
 from handlers.groups import nav_groups, group_callback
 
@@ -50,11 +51,13 @@ log = logging.getLogger(__name__)
 async def daily_bonus_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
     pool = await db.get_pool()
     async with pool.acquire() as conn:
-        users = await conn.fetch("SELECT user_id FROM users WHERE user_id > 0 AND (last_daily IS NULL OR last_daily < CURRENT_DATE)")
-        msg = "🎁 *Your daily bonus is ready!*\n\nClaim it now from the 💰 Earnings menu! (Requires 2 invites this week to activate)"
+        users = await conn.fetch("SELECT user_id, full_name FROM users WHERE user_id > 0 AND (last_daily IS NULL OR last_daily < CURRENT_DATE)")
         for u in users:
+            name = u["full_name"] or "User"
+            msg = f"🎁 *Your daily bonus is ready, {name}!*\n\nClaim it now from the 💰 Earnings menu! (Requires 2 invites this week to activate)"
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🎁 Claim Daily Bonus", callback_data="earnings:daily")]])
             try:
-                await context.bot.send_message(u["user_id"], msg, parse_mode="Markdown")
+                await context.bot.send_message(u["user_id"], msg, parse_mode="Markdown", reply_markup=keyboard)
                 import asyncio
                 await asyncio.sleep(0.05) # Safe rate limit: 20 msgs per sec
             except Exception:
@@ -282,6 +285,12 @@ def main():
     app.add_handler(CommandHandler("test_cleanup", test_cleanup_job))
     app.add_handler(CommandHandler("profile", nav_profile))
     app.add_handler(CommandHandler("mygroups", nav_groups))
+    
+    # Balance fixes
+    app.add_handler(CommandHandler("addbalance", cmd_addbalance))
+    app.add_handler(CommandHandler("deductbalance", cmd_deductbalance))
+    app.add_handler(CommandHandler("setbalance", cmd_setbalance))
+
 
     # ── Inline nav buttons ────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(nav_start,    pattern="^nav:start$"))
