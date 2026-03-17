@@ -165,9 +165,9 @@ async def show_past_winners(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for w in winners:
             date_str = w["draw_date"].strftime("%Y-%m-%d")
             text += f"📅 <b>{date_str}</b>\n"
-            text += f"🥇 $200 — {w['w1_name'] or w['w1_uname']}\n"
-            text += f"🥈 $70 — {w['w2_name'] or w['w2_uname']}\n"
-            text += f"🥉 $30 — {w['w3_name'] or w['w3_uname']}\n\n"
+            text += f"🥇 ${w['prize_1']} — {w['w1_name'] or w['w1_uname']}\n"
+            text += f"🥈 ${w['prize_2']} — {w['w2_name'] or w['w2_uname']}\n"
+            text += f"🥉 ${w['prize_3']} — {w['w3_name'] or w['w3_uname']}\n\n"
             
     # Keyboard to go back to draw menu
     keyboard = [[InlineKeyboardButton("🔙 Back to Lucky Draw", callback_data="nav:luckydraw")]]

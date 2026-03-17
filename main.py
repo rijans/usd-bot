@@ -114,9 +114,14 @@ async def finish_lucky_draw_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             return
 
         w1_id, w2_id, w3_id = fake_pool[0]["user_id"], fake_pool[1]["user_id"], fake_pool[2]["user_id"]
+        
+        # Fetch current prize settings
+        p1 = await db.get_setting("ld_prize_1", "200")
+        p2 = await db.get_setting("ld_prize_2", "70")
+        p3 = await db.get_setting("ld_prize_3", "30")
 
         # 2. Record the winners
-        await db.set_today_lucky_draw_winners(w1_id, w2_id, w3_id)
+        await db.set_today_lucky_draw_winners(w1_id, w2_id, w3_id, p1, p2, p3)
 
         # 3. Inform all REAL users who participated today
         participants = await db.get_today_lucky_draw_participants()
@@ -217,6 +222,17 @@ async def auto_promote_job(context: ContextTypes.DEFAULT_TYPE) -> None:
 async def post_init(application: Application) -> None:
     await db.init_schema()
     log.info("DB schema ready.")
+
+    # Migration: add prize columns if they don't exist
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        try:
+            await conn.execute("ALTER TABLE lucky_draw_winners ADD COLUMN IF NOT EXISTS prize_1 TEXT NOT NULL DEFAULT '200'")
+            await conn.execute("ALTER TABLE lucky_draw_winners ADD COLUMN IF NOT EXISTS prize_2 TEXT NOT NULL DEFAULT '70'")
+            await conn.execute("ALTER TABLE lucky_draw_winners ADD COLUMN IF NOT EXISTS prize_3 TEXT NOT NULL DEFAULT '30'")
+            log.info("Lucky Draw Winners prize columns migration done.")
+        except Exception as e:
+            log.error(f"Migration error: {e}")
     
     # Schedule daily bonus reminder at 10:00 UTC
     import datetime

@@ -136,6 +136,9 @@ CREATE TABLE IF NOT EXISTS lucky_draw_winners (
     winner_1_id     BIGINT      NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     winner_2_id     BIGINT      NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     winner_3_id     BIGINT      NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    prize_1         TEXT        NOT NULL DEFAULT '200',
+    prize_2         TEXT        NOT NULL DEFAULT '70',
+    prize_3         TEXT        NOT NULL DEFAULT '30',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 """
@@ -989,17 +992,20 @@ async def get_today_lucky_draw_participants() -> list[int]:
         records = await conn.fetch("SELECT DISTINCT user_id FROM lucky_draw_entries WHERE draw_date=CURRENT_DATE")
         return [r["user_id"] for r in records]
 
-async def set_today_lucky_draw_winners(w1: int, w2: int, w3: int) -> None:
+async def set_today_lucky_draw_winners(w1: int, w2: int, w3: int, p1: str, p2: str, p3: str) -> None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute(
-            """INSERT INTO lucky_draw_winners (draw_date, winner_1_id, winner_2_id, winner_3_id) 
-               VALUES (CURRENT_DATE, $1, $2, $3)
+            """INSERT INTO lucky_draw_winners (draw_date, winner_1_id, winner_2_id, winner_3_id, prize_1, prize_2, prize_3) 
+               VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, $6)
                ON CONFLICT (draw_date) DO UPDATE 
                SET winner_1_id=EXCLUDED.winner_1_id, 
                    winner_2_id=EXCLUDED.winner_2_id, 
-                   winner_3_id=EXCLUDED.winner_3_id""",
-            w1, w2, w3
+                   winner_3_id=EXCLUDED.winner_3_id,
+                   prize_1=EXCLUDED.prize_1,
+                   prize_2=EXCLUDED.prize_2,
+                   prize_3=EXCLUDED.prize_3""",
+            w1, w2, w3, p1, p2, p3
         )
 
 async def get_past_lucky_draw_winners(limit: int = 5) -> list:
@@ -1007,7 +1013,7 @@ async def get_past_lucky_draw_winners(limit: int = 5) -> list:
     async with pool.acquire() as conn:
         return await conn.fetch(
             """SELECT 
-                 w.draw_date,
+                 w.draw_date, w.prize_1, w.prize_2, w.prize_3,
                  u1.full_name as w1_name, u1.username as w1_uname,
                  u2.full_name as w2_name, u2.username as w2_uname,
                  u3.full_name as w3_name, u3.username as w3_uname
