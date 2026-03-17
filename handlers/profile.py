@@ -30,6 +30,7 @@ PROFILE_FIELDS = [
     ("stars_username", "⭐", "Stars Username",         "e.g. @yourname"),
     ("bio",            "💼", "Bio / Note",            "Short note about yourself"),
     ("alt_username",   "🔗", "Alt Telegram Account", "e.g. @otheraccount"),
+    ("country",        "🌍", "Country",               "Select from list"),
 ]
 
 FIELD_BY_KEY = {f[0]: f for f in PROFILE_FIELDS}
@@ -44,10 +45,13 @@ def _mask(value: str) -> str:
     return value[:4] + "…" + value[-4:]
 
 
-def _profile_text(user, profile) -> str:
+def _profile_text(user, profile, w_stats=None) -> str:
     joined = user["joined_at"].strftime("%b %Y") if user.get("joined_at") else "?"
     name   = user.get("full_name", "?")
     uname  = f"@{user['username']}" if user.get("username") else "—"
+    
+    paid = w_stats["paid"] if w_stats else 0.0
+    rejected = w_stats["rejected"] if w_stats else 0.0
 
     lines = [
         f"👤 *Your Profile*\n",
@@ -56,6 +60,8 @@ def _profile_text(user, profile) -> str:
         f"📅 *Member since:* {joined}",
         f"💰 *Balance:* {fmt_balance(user['balance'])}",
         f"👥 *Total Invites:* {user['total_invites']}",
+        f"✅ *Paid Withdrawals:* {fmt_balance(paid)}",
+        f"❌ *Rejected Withdrawals:* {fmt_balance(rejected)}",
         f"\n━━━━━━━━━━━━━━\n",
     ]
 
@@ -89,8 +95,9 @@ async def nav_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user    = await db.get_user(user_id)
     profile = await db.get_profile(user_id)
+    w_stats = await db.get_withdrawal_stats(user_id)
 
-    text   = _profile_text(user, profile)
+    text   = _profile_text(user, profile, w_stats)
     markup = _profile_keyboard()
 
     if edit_fn:
@@ -134,6 +141,29 @@ async def profile_edit_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         await query.message.reply_text(text, parse_mode="Markdown", reply_markup=contact_keyboard)
         return AWAIT_PHONE_SHARE
+        
+    if field_key == "country":
+        text = (
+            f"🌍 *Select Your Country*\n\n"
+            f"Choose your country from the list below or type it manually.\n"
+            f"_(Type /cancel to abort)_"
+        )
+        countries = [
+            "🇺🇸 USA", "🇬🇧 UK", "🇨🇦 Canada", "🇦🇺 Australia", "🇮🇳 India", 
+            "🇵🇰 Pakistan", "🇧🇩 Bangladesh", "🇳🇬 Nigeria", "🇷🇺 Russia", 
+            "🇮🇷 Iran", "🇰🇵 North Korea", "🇾🇪 Yemen", "🇸🇾 Syria", 
+            "🇨🇳 China", "🇧🇷 Brazil", "🇮🇩 Indonesia", "🇹🇷 Turkey",
+            "🇪🇬 Egypt", "🇿🇦 South Africa", "🇲🇽 Mexico", "🇩🇪 Germany",
+            "🇫🇷 France", "🇮🇹 Italy", "🇪🇸 Spain", "🇦🇪 UAE", "🇸🇦 Saudi Arabia"
+        ]
+        # Arrange in a 2-column grid
+        rows = [[KeyboardButton(c1), KeyboardButton(c2)] for c1, c2 in zip(countries[0::2], countries[1::2])]
+        if len(countries) % 2 != 0:
+            rows.append([KeyboardButton(countries[-1])])
+        
+        country_kbd = ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=True)
+        await query.message.reply_text(text, parse_mode="Markdown", reply_markup=country_kbd)
+        return EDIT_PROFILE_VALUE
 
     text = (
         f"{emoji} *Edit {label}*\n\n"
@@ -164,8 +194,10 @@ async def profile_receive_phone_share(update: Update, context: ContextTypes.DEFA
         # Show profile
         user    = await db.get_user(user_id)
         profile = await db.get_profile(user_id)
+        w_stats = await db.get_withdrawal_stats(user_id)
+        
         await update.message.reply_text(
-            _profile_text(user, profile),
+            _profile_text(user, profile, w_stats),
             parse_mode="Markdown",
             reply_markup=_profile_keyboard(),
         )
@@ -209,8 +241,10 @@ async def profile_receive_value(update: Update, context: ContextTypes.DEFAULT_TY
     # Reload profile screen
     user    = await db.get_user(user_id)
     profile = await db.get_profile(user_id)
+    w_stats = await db.get_withdrawal_stats(user_id)
+    
     await update.message.reply_text(
-        _profile_text(user, profile),
+        _profile_text(user, profile, w_stats),
         parse_mode="Markdown",
         reply_markup=_profile_keyboard(),
     )
@@ -228,8 +262,10 @@ async def cancel_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Re-show profile
     user    = await db.get_user(user_id)
     profile = await db.get_profile(user_id)
+    w_stats = await db.get_withdrawal_stats(user_id)
+    
     await update.effective_message.reply_text(
-        _profile_text(user, profile),
+        _profile_text(user, profile, w_stats),
         parse_mode="Markdown",
         reply_markup=_profile_keyboard(),
     )

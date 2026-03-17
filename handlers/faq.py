@@ -1,11 +1,14 @@
 """
-handlers/faq.py  ─  FAQ page for users.
+handlers/faq.py  ─  FAQ & Support page for users.
 """
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, ConversationHandler
 
 import core.db as db
 from core.ui import fmt_balance
+
+# Conversation state
+TICKET_WRITE = 60  # Waiting for user to type their complaint/feedback
 
 
 FAQ_SECTIONS = [
@@ -99,6 +102,8 @@ FAQ_CONTENT = {
 
 def _faq_menu_keyboard() -> InlineKeyboardMarkup:
     buttons = [[InlineKeyboardButton(label, callback_data=cb)] for cb, label in FAQ_SECTIONS]
+    buttons.append([InlineKeyboardButton("✉️ Submit Feedback / Complaint", callback_data="ticket:new")])
+    buttons.append([InlineKeyboardButton("📂 My Ticket Status", callback_data="ticket:status")])
     buttons.append([InlineKeyboardButton("🔙 Back", callback_data="nav:start")])
     return InlineKeyboardMarkup(buttons)
 
@@ -111,10 +116,11 @@ def _faq_back_keyboard(section_cb: str) -> InlineKeyboardMarkup:
 
 
 async def nav_faq(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Main FAQ menu."""
+    """Main FAQ & Support menu."""
     text = (
-        "❓ *Frequently Asked Questions*\n\n"
-        "Choose a topic below to learn more:"
+        "❓ *FAQ & Support*\n\n"
+        "Choose a topic to learn more, or contact our support team:\n\n"
+        "💬 You can submit a complaint or feedback — our admins will respond within 24 hours."
     )
     markup = _faq_menu_keyboard()
 
@@ -144,3 +150,85 @@ async def faq_section(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown",
         reply_markup=_faq_back_keyboard(section),
     )
+
+
+# ── Support Ticket Flow ───────────────────────────────────────────────────────
+
+async def ticket_new_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """User tapped 'Submit Feedback / Complaint' → ask them to type their message."""
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "✉️ *Submit Feedback or Complaint*\n\n"
+        "Please type your message below. Include as much detail as possible.\n\n"
+        "Our admins will review it and reply to you here.\n\n"
+        "_(Type /cancel to abort)_",
+        parse_mode="Markdown",
+    )
+    return TICKET_WRITE
+
+
+async def ticket_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Save the ticket to DB and confirm to the user."""
+    user_id = update.effective_user.id
+    message = update.message.text.strip()
+
+    if len(message) < 5:
+        await update.message.reply_text("⚠️ Message is too short. Please provide more detail.")
+        return TICKET_WRITE
+
+    ticket_id = await db.create_ticket(user_id, message)
+    await update.message.reply_text(
+        f"✅ *Ticket #{ticket_id} submitted!*\n\n"
+        "Thank you for your feedback. Our team will review it and reply to you soon.\n\n"
+        "You can check the status anytime via *FAQ & Support → My Ticket Status*.",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ Back to FAQ", callback_data="nav:faq")],
+        ])
+    )
+    return ConversationHandler.END
+
+
+async def ticket_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("❌ Ticket cancelled.")
+    return ConversationHandler.END
+
+
+async def ticket_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show the user's own open/answered tickets."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        tickets = await conn.fetch(
+            "SELECT id, message, status, reply, created_at FROM tickets WHERE user_id=$1 ORDER BY created_at DESC LIMIT 10",
+            user_id
+        )
+
+    if not tickets:
+        await query.edit_message_text(
+            "📂 *My Tickets*\n\nYou have not submitted any support tickets yet.",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back to FAQ", callback_data="nav:faq")]])
+        )
+        return
+
+    STATUS_ICONS = {"open": "🟡 Open", "answered": "✅ Answered", "closed": "🔒 Closed"}
+    lines = ["📂 *My Support Tickets*\n"]
+    for t in tickets:
+        icon = STATUS_ICONS.get(t["status"], t["status"])
+        snippet = t["message"][:60] + ("…" if len(t["message"]) > 60 else "")
+        lines.append(f"*#{t['id']}* {icon}\n_{snippet}_")
+        if t["reply"]:
+            lines.append(f"↩️ *Admin reply:* {t['reply'][:100]}")
+        lines.append("")
+
+    await query.edit_message_text(
+        "\n".join(lines),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back to FAQ", callback_data="nav:faq")]])
+    )
+

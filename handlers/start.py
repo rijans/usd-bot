@@ -14,7 +14,7 @@ from core.ui import nav_keyboard, BOT_NAME, fmt_balance
 REPLY_KEYBOARD = ReplyKeyboardMarkup(
     [
         [KeyboardButton("💰 Earnings"),       KeyboardButton("📋 Tasks")],
-        [KeyboardButton("🤝 Refer & Earn"),   KeyboardButton("❓ FAQ")],
+        [KeyboardButton("🤝 Refer & Earn"),   KeyboardButton("❓ FAQ & Support")],
         [KeyboardButton("💸 Withdraw"),       KeyboardButton("👤 Profile")],
         [KeyboardButton("🏠 Home")],
     ],

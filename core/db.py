@@ -108,6 +108,17 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     paypal_email    TEXT,
     stars_username  TEXT,
     alt_username    TEXT,
+    country         TEXT,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS tickets (
+    id              SERIAL      PRIMARY KEY,
+    user_id         BIGINT      REFERENCES users(user_id) ON DELETE CASCADE,
+    message         TEXT        NOT NULL,
+    reply           TEXT,
+    status          TEXT        NOT NULL DEFAULT 'open', -- 'open', 'answered', 'closed'
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 """
@@ -119,6 +130,9 @@ async def init_schema():
         
         # Add reject_reason column for backward compatibility
         await conn.execute("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS reject_reason TEXT;")
+        
+        # Add country column for backward compatibility
+        await conn.execute("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS country TEXT;")
         
         # Insert defaults if empty
         await conn.execute(
@@ -828,6 +842,84 @@ async def get_saved_address(user_id: int, method: str) -> Optional[str]:
         if row:
             return row[field]
         return None
+
+
+async def get_withdrawal_stats(user_id: int) -> dict:
+    """Return the total paid and rejected withdrawal amounts for the user."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        paid = await conn.fetchval(
+            "SELECT SUM(amount) FROM withdrawals WHERE user_id=$1 AND status='paid'",
+            user_id
+        )
+        rejected = await conn.fetchval(
+            "SELECT SUM(amount) FROM withdrawals WHERE user_id=$1 AND status='rejected'",
+            user_id
+        )
+        return {
+            "paid": float(paid) if paid else 0.0,
+            "rejected": float(rejected) if rejected else 0.0
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Support Tickets
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def create_ticket(user_id: int, message: str) -> int:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchval(
+            "INSERT INTO tickets (user_id, message) VALUES ($1, $2) RETURNING id",
+            user_id, message
+        )
+
+
+async def get_open_tickets(limit: int = 50) -> list[asyncpg.Record]:
+    """Admin view: fetch latest unresolved tickets, sorted oldest first."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetch(
+            """SELECT t.*, u.full_name, u.username
+               FROM tickets t
+               JOIN users u ON t.user_id = u.user_id
+               WHERE t.status = 'open'
+               ORDER BY t.created_at ASC
+               LIMIT $1""",
+            limit
+        )
+
+
+async def get_ticket(ticket_id: int) -> Optional[asyncpg.Record]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchrow(
+            """SELECT t.*, u.full_name, u.username
+               FROM tickets t
+               JOIN users u ON t.user_id = u.user_id
+               WHERE t.id = $1""",
+            ticket_id
+        )
+
+
+async def reply_ticket(ticket_id: int, reply_text: str) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """UPDATE tickets 
+               SET reply = $1, status = 'answered', updated_at = NOW() 
+               WHERE id = $2""",
+            reply_text, ticket_id
+        )
+
+
+async def close_ticket(ticket_id: int) -> None:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE tickets SET status = 'closed', updated_at = NOW() WHERE id = $1",
+            ticket_id
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

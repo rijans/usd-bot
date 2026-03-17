@@ -29,7 +29,7 @@ def nav_keyboard(extra: list[list[InlineKeyboardButton]] = None) -> InlineKeyboa
         ],
         [
             InlineKeyboardButton("👤 Profile",      callback_data="nav:profile"),
-            InlineKeyboardButton("❓ FAQ",            callback_data="nav:faq"),
+            InlineKeyboardButton("❓ FAQ & Support",  callback_data="nav:faq"),
         ],
         [
             InlineKeyboardButton("👥 For Group Owners", callback_data="nav:groups"),

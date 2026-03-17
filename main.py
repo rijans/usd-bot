@@ -18,7 +18,7 @@ from handlers.start    import cmd_start, nav_start
 from handlers.tasks    import nav_tasks, task_view, task_verify
 from handlers.earnings import nav_earnings, claim_daily, show_leaderboard, nav_history
 from handlers.referral import nav_share, nav_refer
-from handlers.faq import nav_faq, faq_section
+from handlers.faq import nav_faq, faq_section, ticket_new_start, ticket_receive, ticket_cancel, ticket_status, TICKET_WRITE
 from handlers.profile import (
     nav_profile, profile_edit_start, profile_receive_value,
     profile_receive_phone_share, cancel_profile,
@@ -37,7 +37,8 @@ from handlers.admin import (
     BROADCAST_TEXT, EDIT_SETTING, WREJECT_REASON,
     EDIT_TASK_TITLE, EDIT_TASK_CHAT, EDIT_TASK_LINK,
     LOOKUP_USER, admin_ids,
-    cmd_addbalance, cmd_deductbalance, cmd_setbalance
+    cmd_addbalance, cmd_deductbalance, cmd_setbalance,
+    admin_ticket_reply_text, ADMIN_REPLY_TICKET
 )
 from handlers.groups import nav_groups, group_callback
 
@@ -246,7 +247,7 @@ async def reply_kb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await nav_earnings(update, context)
     elif text in ("🤝 Refer & Earn", "📤 Share", "👥 Refer"):
         await nav_refer(update, context)
-    elif text == "❓ FAQ":
+    elif text in ("❓ FAQ", "❓ FAQ & Support"):
         await nav_faq(update, context)
     elif text == "💸 Withdraw":
         await nav_withdraw(update, context)
@@ -301,6 +302,21 @@ def main():
     app.add_handler(CallbackQueryHandler(nav_faq,      pattern="^nav:faq$"))
     app.add_handler(CallbackQueryHandler(faq_section,  pattern="^faq:"))
     app.add_handler(CallbackQueryHandler(nav_profile,  pattern="^nav:profile$"))
+    app.add_handler(CallbackQueryHandler(ticket_status, pattern="^ticket:status$"))
+
+    # ── Ticket Submission ConversationHandler ─────────────────────────────
+    ticket_conv = ConversationHandler(
+        entry_points=[CallbackQueryHandler(ticket_new_start, pattern="^ticket:new$")],
+        states={
+            TICKET_WRITE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ticket_receive),
+                CommandHandler("cancel", ticket_cancel),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", ticket_cancel)],
+        per_message=False,
+    )
+    app.add_handler(ticket_conv)
 
     # ── Group callback ────────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(nav_groups,     pattern="^nav:groups$"))
@@ -376,6 +392,7 @@ def main():
             EDIT_TASK_CHAT:   [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_task_chat)],
             EDIT_TASK_LINK:   [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_task_link)],
             LOOKUP_USER:      [MessageHandler(filters.TEXT & ~filters.COMMAND, lookup_user_text)],
+            ADMIN_REPLY_TICKET:[MessageHandler(filters.TEXT & ~filters.COMMAND, admin_ticket_reply_text)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         per_message=False,
@@ -386,7 +403,7 @@ def main():
     # Must be registered AFTER ConversationHandlers so it doesn't
     # intercept messages meant for conversation steps.
     KEYBOARD_FILTER = filters.Regex(
-        r"^(🏠 Home|📋 Tasks|💰 Earnings|🤝 Refer & Earn|❓ FAQ|💸 Withdraw|👤 Profile)$"
+        r"^(🏠 Home|📋 Tasks|💰 Earnings|🤝 Refer & Earn|❓ FAQ & Support|❓ FAQ|💸 Withdraw|👤 Profile)$"
     )
     app.add_handler(MessageHandler(filters.TEXT & KEYBOARD_FILTER, reply_kb_handler))
 

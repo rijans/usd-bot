@@ -36,6 +36,7 @@ EDIT_TASK_TITLE = 60
 EDIT_TASK_CHAT  = 61
 EDIT_TASK_LINK  = 62
 LOOKUP_USER     = 70
+ADMIN_REPLY_TICKET = 80
 
 
 def admin_ids() -> list[int]:
@@ -83,6 +84,7 @@ def _admin_keyboard():
         [InlineKeyboardButton("💸 Withdrawals", callback_data="adm:withdrawals")],
         [InlineKeyboardButton("📢 Broadcast", callback_data="adm:broadcast")],
         [InlineKeyboardButton("🔍 Lookup User", callback_data="adm:lookup")],
+        [InlineKeyboardButton("✉️ Support Tickets", callback_data="adm:tickets")],
         [InlineKeyboardButton("⚙️ Settings", callback_data="adm:settings")],
         [InlineKeyboardButton("📊 Full Stats", callback_data="adm:stats")],
     ])
@@ -264,6 +266,68 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown",
         )
         return BROADCAST_TEXT
+
+    # ── Support Tickets ───────────────────────────────────────────────────────
+    elif data == "adm:tickets":
+        tickets = await db.get_open_tickets(30)
+        if not tickets:
+            await query.edit_message_text(
+                "✅ *No open tickets!* All support tickets have been handled.",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="adm:back")]])
+            )
+            return ConversationHandler.END
+        text = f"✉️ *Open Support Tickets* ({len(tickets)})\n\n"
+        buttons = []
+        for t in tickets:
+            name = (t["full_name"] or "User")[:20]
+            snippet = t["message"][:30].replace("\n", " ") + "…"
+            buttons.append([InlineKeyboardButton(f"#{t['id']} {name}: {snippet}", callback_data=f"adm:ticket_view:{t['id']}")])
+        buttons.append([InlineKeyboardButton("⬅️ Back", callback_data="adm:back")])
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
+        return ConversationHandler.END
+
+    elif data.startswith("adm:ticket_view:"):
+        ticket_id = int(data.split(":")[2])
+        ticket = await db.get_ticket(ticket_id)
+        if not ticket:
+            await query.answer("Ticket not found.", show_alert=True)
+            return ConversationHandler.END
+        name = ticket["full_name"] or "?"
+        uname = f"@{ticket['username']}" if ticket["username"] else f"ID:{ticket['user_id']}"
+        created = ticket["created_at"].strftime("%d %b %H:%M")
+        text = (
+            f"✉️ *Ticket #{ticket['id']}*\n"
+            f"From: {name} ({uname})\n"
+            f"Date: {created}\n"
+            f"Status: {ticket['status']}\n\n"
+            f"💬 *Message:*\n{ticket['message']}"
+        )
+        if ticket["reply"]:
+            text += f"\n\n↩️ *Admin reply:*\n{ticket['reply']}"
+        buttons = [
+            [InlineKeyboardButton("↩️ Reply", callback_data=f"adm:ticket_reply:{ticket_id}"),
+             InlineKeyboardButton("✅ Mark Solved", callback_data=f"adm:ticket_close:{ticket_id}")],
+            [InlineKeyboardButton("⬅️ Back to Tickets", callback_data="adm:tickets")],
+        ]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
+        return ConversationHandler.END
+
+    elif data.startswith("adm:ticket_close:"):
+        ticket_id = int(data.split(":")[2])
+        await db.close_ticket(ticket_id)
+        await query.answer("✅ Ticket closed!", show_alert=True)
+        query.data = "adm:tickets"
+        return await admin_callback(update, context)
+
+    elif data.startswith("adm:ticket_reply:"):
+        ticket_id = int(data.split(":")[2])
+        context.user_data["reply_ticket_id"] = ticket_id
+        await query.edit_message_text(
+            f"↩️ *Reply to Ticket #{ticket_id}*\n\nType your reply message below.\n\n_(Type /cancel to abort)_",
+            parse_mode="Markdown"
+        )
+        return ADMIN_REPLY_TICKET
 
     # ── Lookup User ───────────────────────────────────────────────────────────
     elif data == "adm:lookup":
@@ -844,3 +908,47 @@ async def cmd_setbalance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_user = await conn.fetchrow("SELECT balance FROM users WHERE user_id=$1", user_id)
 
     await update.message.reply_text(f"✅ Set balance of user {user_id} to *${amount:.2f}*.\nOld balance: *${old_balance:.2f}*", parse_mode="Markdown")
+
+
+# ── Reply to Ticket ───────────────────────────────────────────────────────────
+
+@require_admin
+async def admin_ticket_reply_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    ticket_id = context.user_data.get("reply_ticket_id")
+    if not ticket_id:
+        await update.message.reply_text("No active ticket reply session. Type /cancel to abort.")
+        return ADMIN_REPLY_TICKET
+
+    text = update.message.text.strip()
+    ticket = await db.get_ticket(ticket_id)
+    if not ticket:
+        await update.message.reply_text("Ticket no longer exists.")
+        return ConversationHandler.END
+
+    await db.reply_ticket(ticket_id, text)
+    
+    # Notify user
+    try:
+        await context.bot.send_message(
+            chat_id=ticket["user_id"],
+            text=f"✉️ *Support Ticket Update*\n\nYour ticket #{ticket_id} has received a reply from an admin!\n\n💬 *Admin:* {text}\n\n_To check your tickets, visit FAQ & Support -> My Ticket Status._",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"⚠️ Marked as answered, but failed to notify user: `{str(e)}`", parse_mode="Markdown")
+    else:
+        await update.message.reply_text(f"✅ Reply sent to user for Ticket #{ticket_id}!")
+
+    # Return to tickets view
+    class FakeQuery:
+        data = "adm:tickets"
+        from_user = update.message.from_user
+        async def answer(self, *args, **kwargs): pass
+        async def edit_message_text(self, text, **kwargs):
+            await update.message.reply_text(text, **kwargs)
+            
+    class FakeUpdate:
+        callback_query = FakeQuery()
+        effective_user = update.effective_user
+
+    return await admin_callback(FakeUpdate(), context)
