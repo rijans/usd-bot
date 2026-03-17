@@ -18,6 +18,7 @@ from handlers.start    import cmd_start, nav_start
 from handlers.tasks    import nav_tasks, task_view, task_verify
 from handlers.earnings import nav_earnings, claim_daily, show_leaderboard, nav_history
 from handlers.referral import nav_share, nav_refer
+from handlers.faq import nav_faq, faq_section
 from handlers.withdraw import (
     nav_withdraw, pick_method, enter_destination, cancel_withdraw,
     PICK_METHOD, ENTER_DEST,
@@ -201,10 +202,10 @@ async def reply_kb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await nav_tasks(update, context)
     elif text == "💰 Earnings":
         await nav_earnings(update, context)
-    elif text == "📤 Share":
-        await nav_share(update, context)
-    elif text == "👥 Refer":
+    elif text in ("🤝 Refer & Earn", "📤 Share", "👥 Refer"):
         await nav_refer(update, context)
+    elif text == "❓ FAQ":
+        await nav_faq(update, context)
     elif text == "💸 Withdraw":
         await nav_withdraw(update, context)
 
@@ -245,6 +246,8 @@ def main():
     app.add_handler(CallbackQueryHandler(nav_share,    pattern="^nav:share$"))
     app.add_handler(CallbackQueryHandler(nav_earnings, pattern="^nav:earnings$"))
     app.add_handler(CallbackQueryHandler(nav_refer,    pattern="^nav:refer$"))
+    app.add_handler(CallbackQueryHandler(nav_faq,      pattern="^nav:faq$"))
+    app.add_handler(CallbackQueryHandler(faq_section,  pattern="^faq:"))
 
     # ── Group callback ────────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(nav_groups,     pattern="^nav:groups$"))
@@ -307,7 +310,7 @@ def main():
     # Must be registered AFTER ConversationHandlers so it doesn't
     # intercept messages meant for conversation steps.
     KEYBOARD_FILTER = filters.Regex(
-        "^(🏠 Home|📋 Tasks|💰 Earnings|📤 Share|👥 Refer|💸 Withdraw)$"
+        r"^(🏠 Home|📋 Tasks|💰 Earnings|🤝 Refer & Earn|❓ FAQ|💸 Withdraw)$"
     )
     app.add_handler(MessageHandler(filters.TEXT & KEYBOARD_FILTER, reply_kb_handler))
 

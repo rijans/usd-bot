@@ -13,12 +13,11 @@ from core.ui import nav_keyboard, BOT_NAME, fmt_balance
 # This is what users see pinned at the bottom like in the screenshot
 REPLY_KEYBOARD = ReplyKeyboardMarkup(
     [
-        [KeyboardButton("💰 Earnings"),   KeyboardButton("📋 Tasks")],
-        [KeyboardButton("📤 Share"),      KeyboardButton("👥 Refer")],
-        [KeyboardButton("💸 Withdraw"),   KeyboardButton("🏠 Home")],
+        [KeyboardButton("💰 Earnings"),       KeyboardButton("📋 Tasks")],
+        [KeyboardButton("🤝 Refer & Earn"),   KeyboardButton("❓ FAQ")],
+        [KeyboardButton("💸 Withdraw"),       KeyboardButton("🏠 Home")],
     ],
-    resize_keyboard=True,      # Makes buttons smaller, fits better on screen
-#    persistent=True,           # Stays visible even after user sends a message
+    resize_keyboard=True,
     input_field_placeholder="Choose an option or type a command...",
 )
 
