@@ -27,6 +27,7 @@ def nav_keyboard(include_admin: bool = False, include_groups: bool = False) -> I
         [InlineKeyboardButton("🎰 Lucky Draw", callback_data="nav:luckydraw")],
         [InlineKeyboardButton("👤 Profile", callback_data="nav:profile"),
          InlineKeyboardButton("❓ FAQ & Support", callback_data="nav:faq")],
+        [InlineKeyboardButton("👥 For Group Owners", callback_data="nav:groups")],
     ]
     return InlineKeyboardMarkup(buttons)
 
