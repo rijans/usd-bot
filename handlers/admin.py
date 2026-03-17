@@ -85,6 +85,7 @@ def _admin_keyboard():
         [InlineKeyboardButton("📢 Broadcast", callback_data="adm:broadcast")],
         [InlineKeyboardButton("🔍 Lookup User", callback_data="adm:lookup")],
         [InlineKeyboardButton("✉️ Support Tickets", callback_data="adm:tickets")],
+        [InlineKeyboardButton("🎰 Lucky Draw Stats", callback_data="adm:luckydraw")],
         [InlineKeyboardButton("⚙️ Settings", callback_data="adm:settings")],
         [InlineKeyboardButton("📊 Full Stats", callback_data="adm:stats")],
     ])
@@ -431,6 +432,50 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
         return ConversationHandler.END
 
+    elif data == "adm:luckydraw":
+        stats = await db.get_lucky_draw_admin_stats()
+        p1 = await db.get_setting("ld_prize_1", "200")
+        p2 = await db.get_setting("ld_prize_2", "70")
+        p3 = await db.get_setting("ld_prize_3", "30")
+        text = (
+            f"🎰 *Lucky Draw Admin Panel*\n\n"
+            f"📅 *Today's Entries:* {stats['today_entries']}\n"
+            f"⭐️ *Stars Collected Today:* {stats['today_stars']}\n\n"
+            f"📊 *All Time:*\n"
+            f"  Total entries: {stats['total_entries']}\n"
+            f"  Total stars: {stats['total_stars']}\n"
+            f"  Unique buyers: {stats['unique_buyers']}\n\n"
+            f"🏆 *Current Prizes:*\n"
+            f"  🥇 1st Place: ${p1} USD\n"
+            f"  🥈 2nd Place: ${p2} USD\n"
+            f"  🥉 3rd Place: ${p3} USD"
+        )
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📜 Buyer History (Last 20)", callback_data="adm:ld_history")],
+            [InlineKeyboardButton("✏️ Edit 1st Prize ($)", callback_data="adm:edit_set:ld_prize_1"),
+             InlineKeyboardButton("✏️ Edit 2nd Prize ($)", callback_data="adm:edit_set:ld_prize_2")],
+            [InlineKeyboardButton("✏️ Edit 3rd Prize ($)", callback_data="adm:edit_set:ld_prize_3")],
+            [InlineKeyboardButton("⬅️ Back", callback_data="adm:back")],
+        ])
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+        return ConversationHandler.END
+
+    elif data == "adm:ld_history":
+        history = await db.get_lucky_draw_entry_history(limit=20)
+        if not history:
+            text = "🎰 *Lucky Draw Buyer History*\n\n_No entries recorded yet._"
+        else:
+            text = "🎰 *Lucky Draw Buyer History (Last 20)*\n\n"
+            for row in history:
+                name = row['full_name'] or row['username'] or str(row['user_id'])
+                date_str = row['draw_date'].strftime("%b %d")
+                text += f"⭐ {row['stars_paid']} | {name} | {date_str}\n"
+        await query.edit_message_text(
+            text, parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="adm:luckydraw")]])
+        )
+        return ConversationHandler.END
+
     elif data == "adm:toggle_fake":
         current = await db.get_setting("show_fake_leaders", "1")
         new_val = "0" if current == "1" else "1"
@@ -453,6 +498,9 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "referral_reward_primary": "Referral Reward (Primary)",
             "referral_reward_secondary": "Referral Reward (After Threshold)",
             "referral_reward_threshold": "Referral Threshold (referrals)",
+            "ld_prize_1": "Lucky Draw 1st Prize (USD)",
+            "ld_prize_2": "Lucky Draw 2nd Prize (USD)",
+            "ld_prize_3": "Lucky Draw 3rd Prize (USD)",
         }
         # Show current value
         defaults = {
@@ -460,6 +508,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "daily_bonus_primary": "0.20", "daily_bonus_secondary": "0.02",
             "daily_bonus_threshold": "5", "referral_reward_primary": "0.30",
             "referral_reward_secondary": "0.05", "referral_reward_threshold": "5",
+            "ld_prize_1": "200", "ld_prize_2": "70", "ld_prize_3": "30",
         }
         current_val = await db.get_setting(key, defaults.get(key, "0"))
         await query.edit_message_text(

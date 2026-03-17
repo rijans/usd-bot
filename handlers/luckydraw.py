@@ -8,7 +8,8 @@ from core.db import (
     has_user_entered_today,
     get_today_lucky_draw_entries_count,
     get_past_lucky_draw_winners,
-    add_lucky_draw_entry
+    add_lucky_draw_entry,
+    get_setting,
 )
 from core.ui import nav_keyboard
 
@@ -41,12 +42,17 @@ async def show_lucky_draw_menu(update: Update, context: ContextTypes.DEFAULT_TYP
     real_count = await get_today_lucky_draw_entries_count()
     display_count = _display_entry_count(real_count)
 
+    # Configurable prize amounts
+    p1 = await get_setting("ld_prize_1", "200")
+    p2 = await get_setting("ld_prize_2", "70")
+    p3 = await get_setting("ld_prize_3", "30")
+
     text = (
         "🎰 <b>Daily Lucky Draw</b> 🎰\n\n"
         "Welcome to the daily Lucky Draw! Try your luck to win big cash prizes.\n\n"
-        "🥇 <b>1st Place:</b> $200 USD\n"
-        "🥈 <b>2nd Place:</b> $70 USD\n"
-        "🥉 <b>3rd Place:</b> $30 USD\n\n"
+        f"🥇 <b>1st Place:</b> ${p1} USD\n"
+        f"🥈 <b>2nd Place:</b> ${p2} USD\n"
+        f"🥉 <b>3rd Place:</b> ${p3} USD\n\n"
         "<i>Draws reset every day at midnight (UTC). You can enter the draw using Telegram Stars!</i>\n\n"
     )
 

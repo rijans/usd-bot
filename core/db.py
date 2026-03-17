@@ -1002,7 +1002,7 @@ async def set_today_lucky_draw_winners(w1: int, w2: int, w3: int) -> None:
             w1, w2, w3
         )
 
-async def get_past_lucky_draw_winners(limit: int = 5) -> list[asyncpg.Record]:
+async def get_past_lucky_draw_winners(limit: int = 5) -> list:
     pool = await get_pool()
     async with pool.acquire() as conn:
         return await conn.fetch(
@@ -1018,3 +1018,46 @@ async def get_past_lucky_draw_winners(limit: int = 5) -> list[asyncpg.Record]:
                ORDER BY w.draw_date DESC LIMIT $1""",
             limit
         )
+
+
+async def get_lucky_draw_admin_stats() -> dict:
+    """Return aggregated Lucky Draw statistics for the admin panel."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        today_entries = await conn.fetchval(
+            "SELECT COUNT(*) FROM lucky_draw_entries WHERE draw_date=CURRENT_DATE"
+        )
+        today_stars = await conn.fetchval(
+            "SELECT COALESCE(SUM(stars_paid), 0) FROM lucky_draw_entries WHERE draw_date=CURRENT_DATE"
+        )
+        total_entries = await conn.fetchval("SELECT COUNT(*) FROM lucky_draw_entries")
+        total_stars = await conn.fetchval(
+            "SELECT COALESCE(SUM(stars_paid), 0) FROM lucky_draw_entries"
+        )
+        unique_buyers = await conn.fetchval(
+            "SELECT COUNT(DISTINCT user_id) FROM lucky_draw_entries WHERE user_id > 0"
+        )
+        return {
+            "today_entries": int(today_entries),
+            "today_stars": int(today_stars),
+            "total_entries": int(total_entries),
+            "total_stars": int(total_stars),
+            "unique_buyers": int(unique_buyers),
+        }
+
+
+async def get_lucky_draw_entry_history(limit: int = 20) -> list:
+    """Return the last N real-user Lucky Draw purchases for the admin history log."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetch(
+            """SELECT e.draw_date, e.stars_paid, e.created_at,
+                      u.full_name, u.username, u.user_id
+               FROM lucky_draw_entries e
+               JOIN users u ON e.user_id = u.user_id
+               WHERE u.user_id > 0
+               ORDER BY e.created_at DESC
+               LIMIT $1""",
+            limit
+        )
+
