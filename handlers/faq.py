@@ -17,7 +17,7 @@ FAQ_SECTIONS = [
     ("faq:refer",     "🤝 Referrals & Invites"),
     ("faq:withdraw",  "💸 Withdrawals"),
     ("faq:leaderboard", "🏆 Leaderboard & Prizes"),
-    ("faq:groups",    "📢 Group Auto-Promoter"),
+    ("faq:groups",    "📢 Auto Promote in Group"),
 ]
 
 FAQ_CONTENT = {
