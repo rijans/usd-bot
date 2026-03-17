@@ -21,8 +21,9 @@ from core.ui import nav_keyboard, fmt_balance
 from handlers.admin import admin_ids
 
 # ConversationHandler states
-PICK_METHOD = 1
-ENTER_DEST  = 2
+PICK_METHOD  = 1
+ENTER_DEST   = 2
+USE_SAVED    = 3
 
 METHODS = {
     "ton":    ("🔷 TON (Crypto)",       "Please enter your *TON wallet address*:"),
@@ -90,6 +91,26 @@ async def pick_method(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["withdraw_method"] = method_key
     context.user_data["withdraw_label"]  = label
 
+    # Check if the user has a saved address for this method
+    user_id = query.from_user.id
+    saved   = await db.get_saved_address(user_id, method_key)
+
+    if saved:
+        context.user_data["withdraw_saved"] = saved
+        masked = saved[:6] + "…" + saved[-4:] if len(saved) > 10 else saved
+        await query.edit_message_text(
+            f"💸 *Withdraw via {label}*\n\n"
+            f"📎 *Saved address found:*\n`{masked}`\n\n"
+            f"Would you like to use your saved address, or enter a new one?",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ Use Saved Address", callback_data="wdraw:use_saved")],
+                [InlineKeyboardButton("✏️ Enter New Address",  callback_data="wdraw:enter_new")],
+                [InlineKeyboardButton("❌ Cancel",             callback_data="nav:start")],
+            ])
+        )
+        return USE_SAVED
+
     await query.edit_message_text(
         f"💸 *Withdraw via {label}*\n\n"
         f"{prompt}\n\n"
@@ -98,6 +119,54 @@ async def pick_method(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return ENTER_DEST
 
+
+async def use_saved_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """User chose to use their saved address or enter a new one."""
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "wdraw:use_saved":
+        dest         = context.user_data.pop("withdraw_saved", "")
+        method_key   = context.user_data.get("withdraw_method")
+        method_label = context.user_data.get("withdraw_label", "")
+        user_id      = query.from_user.id
+
+        is_admin = user_id in admin_ids()
+        can, reason = await db.can_withdraw(user_id, is_admin=is_admin)
+        if not can:
+            await query.edit_message_text(_blocked_message(reason), parse_mode="Markdown",
+                                          reply_markup=nav_keyboard())
+            return ConversationHandler.END
+
+        user   = await db.get_user(user_id)
+        amount = float(user["balance"])
+        await db.create_withdrawal(user_id, amount, method_label, dest)
+
+        text = (
+            f"✅ *Withdrawal Request Submitted*\n\n"
+            f"💵 Amount: *{fmt_balance(amount)}*\n"
+            f"📤 Method: *{method_label}*\n"
+            f"🔑 Destination: `{dest}`\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Your request is pending admin review. You will be notified once processed. 🙏"
+        )
+        context.user_data.pop("withdraw_method", None)
+        context.user_data.pop("withdraw_label",  None)
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=nav_keyboard())
+        return ConversationHandler.END
+
+    else:  # wdraw:enter_new
+        method_key = context.user_data.get("withdraw_method", "")
+        label      = context.user_data.get("withdraw_label", "")
+        _, prompt  = METHODS.get(method_key, ("", "Please enter your address:"))
+        context.user_data.pop("withdraw_saved", None)
+        await query.edit_message_text(
+            f"💸 *Withdraw via {label}*\n\n"
+            f"{prompt}\n\n"
+            f"_(Type /cancel to abort)_",
+            parse_mode="Markdown",
+        )
+        return ENTER_DEST
 
 async def enter_destination(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id

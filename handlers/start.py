@@ -15,7 +15,8 @@ REPLY_KEYBOARD = ReplyKeyboardMarkup(
     [
         [KeyboardButton("💰 Earnings"),       KeyboardButton("📋 Tasks")],
         [KeyboardButton("🤝 Refer & Earn"),   KeyboardButton("❓ FAQ")],
-        [KeyboardButton("💸 Withdraw"),       KeyboardButton("🏠 Home")],
+        [KeyboardButton("💸 Withdraw"),       KeyboardButton("👤 Profile")],
+        [KeyboardButton("🏠 Home")],
     ],
     resize_keyboard=True,
     input_field_placeholder="Choose an option or type a command...",

@@ -19,9 +19,14 @@ from handlers.tasks    import nav_tasks, task_view, task_verify
 from handlers.earnings import nav_earnings, claim_daily, show_leaderboard, nav_history
 from handlers.referral import nav_share, nav_refer
 from handlers.faq import nav_faq, faq_section
+from handlers.profile import (
+    nav_profile, profile_edit_start, profile_receive_value,
+    profile_receive_phone_share, cancel_profile,
+    EDIT_PROFILE_VALUE, AWAIT_PHONE_SHARE,
+)
 from handlers.withdraw import (
-    nav_withdraw, pick_method, enter_destination, cancel_withdraw,
-    PICK_METHOD, ENTER_DEST,
+    nav_withdraw, pick_method, use_saved_address, enter_destination, cancel_withdraw,
+    PICK_METHOD, ENTER_DEST, USE_SAVED,
 )
 from handlers.admin import (
     cmd_admin, admin_callback, cancel, edit_setting_value,
@@ -61,6 +66,32 @@ async def test_daily_job(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_text("Triggering test daily broadcast...")
     await daily_bonus_reminder(context)
     await update.message.reply_text("Broadcast complete.")
+
+
+async def cleanup_deleted_accounts(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Check all users — if Telegram says 'deactivated', delete them from DB."""
+    import asyncio
+    user_ids = await db.get_all_real_user_ids()
+    deleted_count = 0
+    for uid in user_ids:
+        try:
+            await context.bot.send_chat_action(chat_id=uid, action="typing")
+        except Exception as e:
+            err_str = str(e).lower()
+            if "deactivated" in err_str or "not found" in err_str:
+                await db.delete_user(uid)
+                deleted_count += 1
+                log.info(f"Cleaned up deleted account: {uid}")
+        await asyncio.sleep(0.05)  # Rate limit
+    log.info(f"Account cleanup done. Removed {deleted_count} deleted accounts.")
+
+
+async def test_cleanup_job(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.effective_user.id not in admin_ids():
+        return
+    await update.message.reply_text("Scanning for deleted accounts...")
+    await cleanup_deleted_accounts(context)
+    await update.message.reply_text("Cleanup complete.")
 
 
 async def on_bot_added(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -143,6 +174,14 @@ async def post_init(application: Application) -> None:
     application.job_queue.run_repeating(auto_promote_job, interval=300, first=60)
     log.info("Group auto-promoter job scheduled (every 5 min)")
 
+    # Schedule deleted account cleanup every Sunday at 03:00 UTC
+    application.job_queue.run_daily(
+        cleanup_deleted_accounts,
+        datetime.time(hour=3, minute=0, tzinfo=datetime.timezone.utc),
+        days=(6,),  # 6=Sunday
+    )
+    log.info("Weekly account cleanup scheduled (Sundays 03:00 UTC)")
+
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     err = context.error
@@ -208,6 +247,8 @@ async def reply_kb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await nav_faq(update, context)
     elif text == "💸 Withdraw":
         await nav_withdraw(update, context)
+    elif text == "👤 Profile":
+        await nav_profile(update, context)
 
 async def cmd_reseed_fake(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in admin_ids():
@@ -238,6 +279,8 @@ def main():
     app.add_handler(CommandHandler("share",    cmd_share))
     app.add_handler(CommandHandler("reseed_fake", cmd_reseed_fake))
     app.add_handler(CommandHandler("test_daily_job", test_daily_job))
+    app.add_handler(CommandHandler("test_cleanup", test_cleanup_job))
+    app.add_handler(CommandHandler("profile", nav_profile))
     app.add_handler(CommandHandler("mygroups", nav_groups))
 
     # ── Inline nav buttons ────────────────────────────────────────────────────
@@ -248,6 +291,7 @@ def main():
     app.add_handler(CallbackQueryHandler(nav_refer,    pattern="^nav:refer$"))
     app.add_handler(CallbackQueryHandler(nav_faq,      pattern="^nav:faq$"))
     app.add_handler(CallbackQueryHandler(faq_section,  pattern="^faq:"))
+    app.add_handler(CallbackQueryHandler(nav_profile,  pattern="^nav:profile$"))
 
     # ── Group callback ────────────────────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(nav_groups,     pattern="^nav:groups$"))
@@ -274,6 +318,7 @@ def main():
         ],
         states={
             PICK_METHOD: [CallbackQueryHandler(pick_method, pattern="^wdraw:method:")],
+            USE_SAVED:   [CallbackQueryHandler(use_saved_address, pattern="^wdraw:(use_saved|enter_new)$")],
             ENTER_DEST: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, enter_destination),
                 CommandHandler("cancel", cancel_withdraw),
@@ -283,6 +328,27 @@ def main():
         per_message=False,
     )
     app.add_handler(withdraw_conv)
+
+    # ── Profile ConversationHandler ─────────────────────────────────────────────
+    profile_conv = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(profile_edit_start, pattern="^prof:edit:"),
+        ],
+        states={
+            EDIT_PROFILE_VALUE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, profile_receive_value),
+                CommandHandler("cancel", cancel_profile),
+            ],
+            AWAIT_PHONE_SHARE: [
+                MessageHandler(filters.CONTACT, profile_receive_phone_share),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, profile_receive_value),
+                CommandHandler("cancel", cancel_profile),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", cancel_profile)],
+        per_message=False,
+    )
+    app.add_handler(profile_conv)
 
     # ── Admin ConversationHandler ─────────────────────────────────────────────
     admin_conv = ConversationHandler(
@@ -310,7 +376,7 @@ def main():
     # Must be registered AFTER ConversationHandlers so it doesn't
     # intercept messages meant for conversation steps.
     KEYBOARD_FILTER = filters.Regex(
-        r"^(🏠 Home|📋 Tasks|💰 Earnings|🤝 Refer & Earn|❓ FAQ|💸 Withdraw)$"
+        r"^(🏠 Home|📋 Tasks|💰 Earnings|🤝 Refer & Earn|❓ FAQ|💸 Withdraw|👤 Profile)$"
     )
     app.add_handler(MessageHandler(filters.TEXT & KEYBOARD_FILTER, reply_kb_handler))
 

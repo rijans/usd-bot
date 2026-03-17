@@ -97,6 +97,19 @@ CREATE TABLE IF NOT EXISTS promoted_groups (
     active          BOOLEAN     NOT NULL DEFAULT TRUE,
     last_posted_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id         BIGINT      PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+    email           TEXT,
+    phone           TEXT,
+    bio             TEXT,
+    ton_address     TEXT,
+    usdt_address    TEXT,
+    paypal_email    TEXT,
+    stars_username  TEXT,
+    alt_username    TEXT,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 """
 
 async def init_schema():
@@ -756,3 +769,79 @@ async def process_withdrawal(withdrawal_id: int, status: str, reject_reason: Opt
                     w["user_id"], w["amount"]
                 )
             return w
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# User Profiles
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def get_profile(user_id: int) -> Optional[asyncpg.Record]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchrow(
+            "SELECT * FROM user_profiles WHERE user_id=$1", user_id
+        )
+
+
+async def upsert_profile(user_id: int, **fields) -> None:
+    """Save/update one or more profile fields. Pass field=value as kwargs."""
+    if not fields:
+        return
+    pool = await get_pool()
+    cols = list(fields.keys())
+    vals = list(fields.values())
+    # Build: INSERT ... ON CONFLICT DO UPDATE SET col=$2, ...
+    set_clause = ", ".join(f"{c}=${i+2}" for i, c in enumerate(cols))
+    async with pool.acquire() as conn:
+        await conn.execute(
+            f"""
+            INSERT INTO user_profiles (user_id, {', '.join(cols)}, updated_at)
+            VALUES ($1, {', '.join(f'${i+2}' for i in range(len(cols)))}, NOW())
+            ON CONFLICT (user_id) DO UPDATE
+              SET {set_clause}, updated_at=NOW()
+            """,
+            user_id, *vals
+        )
+
+
+# Map withdrawal method key → profile column name
+_METHOD_FIELD = {
+    "ton":    "ton_address",
+    "usdt":   "usdt_address",
+    "paypal": "paypal_email",
+    "stars":  "stars_username",
+}
+
+
+async def get_saved_address(user_id: int, method: str) -> Optional[str]:
+    """Return saved address/email for this withdrawal method, or None."""
+    field = _METHOD_FIELD.get(method)
+    if not field:
+        return None
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            f"SELECT {field} FROM user_profiles WHERE user_id=$1", user_id
+        )
+        if row:
+            return row[field]
+        return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cleanup helper
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def get_all_real_user_ids() -> list[int]:
+    """Return all real (non-fake) user IDs for cleanup scanning."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT user_id FROM users WHERE user_id > 0")
+        return [r["user_id"] for r in rows]
+
+
+async def delete_user(user_id: int) -> None:
+    """Hard-delete a user and all related data (cascades via FK)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM users WHERE user_id=$1", user_id)
