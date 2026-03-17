@@ -63,6 +63,7 @@ async def show_lucky_draw_menu(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         text += (
             "👇 Choose your entry ticket below.\n"
+            "💡 <b>The more Stars you use, the higher your chance of winning!</b>\n"
             "<i>⚠️ Note: Join at your own luck. Stars are non-refundable.</i>\n\n"
             f"🎟 <b>Today's Total Entries:</b> {display_count}"
         )
