@@ -1,4 +1,6 @@
 import logging
+import random
+import datetime
 from telegram import Update, LabeledPrice, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
@@ -12,6 +14,18 @@ from core.ui import nav_keyboard
 
 logger = logging.getLogger(__name__)
 
+
+def _display_entry_count(real_count: int) -> int:
+    """Returns a realistic-looking total entry count.
+    A deterministic daily base (219-534) is seeded from today's date,
+    so it stays consistent within the day and real entries add on top.
+    """
+    today = datetime.date.today()
+    seed = today.year * 10000 + today.month * 100 + today.day
+    rng = random.Random(seed)
+    base = rng.randint(219, 534)
+    return base + real_count
+
 TICKET_PRICES = [
     ("🎫 Buy Entry (50 ⭐️)", 50),
     ("🎫 Buy Entry (100 ⭐️)", 100),
@@ -24,7 +38,8 @@ async def show_lucky_draw_menu(update: Update, context: ContextTypes.DEFAULT_TYP
     user_id = update.effective_user.id
     
     entered_today = await has_user_entered_today(user_id)
-    total_entries = await get_today_lucky_draw_entries_count()
+    real_count = await get_today_lucky_draw_entries_count()
+    display_count = _display_entry_count(real_count)
 
     text = (
         "🎰 <b>Daily Lucky Draw</b> 🎰\n\n"
@@ -38,27 +53,24 @@ async def show_lucky_draw_menu(update: Update, context: ContextTypes.DEFAULT_TYP
     if entered_today:
         text += (
             "✅ <b>You have already entered today's draw!</b>\n"
-            f"There are currently <b>{total_entries}</b> participants today. Good luck!\n\n"
+            f"There are currently <b>{display_count}</b> participants today. Good luck!\n\n"
             "<i>Note: Winners will be notified at the end of the day.</i>"
         )
         keyboard = [
             [InlineKeyboardButton("🎁 View Past Winners", callback_data="ld:winners")],
-            [InlineKeyboardButton("🔙 Back to Home", callback_data="nav:home")]
+            [InlineKeyboardButton("🔙 Back to Home", callback_data="nav:start")]
         ]
     else:
         text += (
             "👇 Choose your entry ticket below.\n"
             "<i>⚠️ Note: Join at your own luck. Stars are non-refundable.</i>\n\n"
-            f"🎟 <b>Today's Total Entries:</b> {total_entries}"
+            f"🎟 <b>Today's Total Entries:</b> {display_count}"
         )
-        
         keyboard = []
-        # Add payment buttons
         for label, stars in TICKET_PRICES:
             keyboard.append([InlineKeyboardButton(label, callback_data=f"ld:buy:{stars}")])
-            
         keyboard.append([InlineKeyboardButton("🎁 View Past Winners", callback_data="ld:winners")])
-        keyboard.append([InlineKeyboardButton("🔙 Back to Home", callback_data="nav:home")])
+        keyboard.append([InlineKeyboardButton("🔙 Back to Home", callback_data="nav:start")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -128,7 +140,7 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
             text, 
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Back to Home", callback_data="nav:home")]
+                [InlineKeyboardButton("🔙 Back to Home", callback_data="nav:start")]
             ])
         )
 
