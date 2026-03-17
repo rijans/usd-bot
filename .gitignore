@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+usd_bot.db
+test_db.py
