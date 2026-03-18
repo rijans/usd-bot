@@ -72,10 +72,36 @@ def _profile_text(user, profile, w_stats=None) -> str:
     return "\n".join(lines)
 
 
+# Mapping for shorter labels in the keyboard specifically
+BUTTON_LABELS = {
+    "email":          "Email",
+    "phone":          "Phone",
+    "ton_address":    "TON",
+    "usdt_address":   "USDT",
+    "paypal_email":   "PayPal",
+    "stars_username": "Stars",
+    "bio":            "Bio",
+    "alt_username":   "Alt Acc",
+    "country":        "Country",
+}
+
+
 def _profile_keyboard() -> InlineKeyboardMarkup:
     rows = []
-    for col, emoji, label, _ in PROFILE_FIELDS:
-        rows.append([InlineKeyboardButton(f"✏️ Edit {emoji} {label}", callback_data=f"prof:edit:{col}")])
+    current_row = []
+    
+    for col, _, label, _ in PROFILE_FIELDS:
+        # Use a shorter label for the button if available
+        short_label = BUTTON_LABELS.get(col, label)
+        current_row.append(InlineKeyboardButton(f"✏️ {short_label}", callback_data=f"prof:edit:{col}"))
+        
+        if len(current_row) == 3:
+            rows.append(current_row)
+            current_row = []
+            
+    if current_row:
+        rows.append(current_row)
+        
     rows.append([InlineKeyboardButton("🔙 Back", callback_data="nav:start")])
     return InlineKeyboardMarkup(rows)
 
