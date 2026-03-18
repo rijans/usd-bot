@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     stars_username  TEXT,
     alt_username    TEXT,
     country         TEXT,
+    location        TEXT,
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

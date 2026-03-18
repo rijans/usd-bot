@@ -17,6 +17,7 @@ from core.ui import fmt_balance, BOT_USERNAME, clean_md
 # ConversationHandler state
 EDIT_PROFILE_VALUE = 50   # Waiting for user to type a new value
 AWAIT_PHONE_SHARE  = 51   # Waiting for Telegram contact share or manual text
+AWAIT_LOCATION_SHARE = 52   # Waiting for Telegram location share or manual text
 
 
 # ── Field registry ────────────────────────────────────────────────────────────
@@ -31,6 +32,7 @@ PROFILE_FIELDS = [
     ("bio",            "💼", "Bio / Note",            "Short note about yourself"),
     ("alt_username",   "🔗", "Alt Telegram Account", "e.g. @otheraccount"),
     ("country",        "🌍", "Country",               "Select from list"),
+    ("location",       "📍", "Location",              "e.g. Dhaka, Bangladesh"),
 ]
 
 FIELD_BY_KEY = {f[0]: f for f in PROFILE_FIELDS}
@@ -83,6 +85,7 @@ BUTTON_LABELS = {
     "bio":            "Bio",
     "alt_username":   "Alt Acc",
     "country":        "Country",
+    "location":       "Location",
 }
 
 
@@ -190,6 +193,22 @@ async def profile_edit_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.message.reply_text(text, parse_mode="Markdown", reply_markup=country_kbd)
         return EDIT_PROFILE_VALUE
 
+    if field_key == "location":
+        text = (
+            f"📍 *Edit Location*\n\n"
+            f"Share your location accurately:\n\n"
+            f"• Tap *📍 Share my location* to use your current GPS\n"
+            f"• Or type your city/area manually below\n\n"
+            f"_(Type /cancel to abort)_"
+        )
+        loc_keyboard = ReplyKeyboardMarkup(
+            [[KeyboardButton("📍 Share my location", request_location=True)]],
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        )
+        await query.message.reply_text(text, parse_mode="Markdown", reply_markup=loc_keyboard)
+        return AWAIT_LOCATION_SHARE
+
     text = (
         f"{emoji} *Edit {label}*\n\n"
         f"Current value will be replaced.\n"
@@ -229,6 +248,36 @@ async def profile_receive_phone_share(update: Update, context: ContextTypes.DEFA
         return ConversationHandler.END
 
     # User typed manually instead
+    return await profile_receive_value(update, context)
+
+
+async def profile_receive_location_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle Telegram native location share (message.location)."""
+    loc = update.message.location
+    user_id = update.effective_user.id
+
+    if loc:
+        # We'll save as text "Lat: X, Lon: Y" roughly or just a link?
+        # A Google Maps link is most useful for admins
+        val = f"https://www.google.com/maps?q={loc.latitude},{loc.longitude}"
+        await db.upsert_profile(user_id, location=val)
+        await update.message.reply_text(
+            f"✅ *Location saved!*\n\n📍 `{val}`",
+            parse_mode="Markdown",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        # Show profile
+        user    = await db.get_user(user_id)
+        profile = await db.get_profile(user_id)
+        w_stats = await db.get_withdrawal_stats(user_id)
+        
+        await update.message.reply_text(
+            _profile_text(user, profile, w_stats),
+            parse_mode="Markdown",
+            reply_markup=_profile_keyboard(),
+        )
+        return ConversationHandler.END
+
     return await profile_receive_value(update, context)
 
 

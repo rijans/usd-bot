@@ -22,8 +22,8 @@ from handlers.referral import nav_share, nav_refer
 from handlers.faq import nav_faq, faq_section, ticket_new_start, ticket_receive, ticket_cancel, ticket_status, TICKET_WRITE
 from handlers.profile import (
     nav_profile, profile_edit_start, profile_receive_value,
-    profile_receive_phone_share, cancel_profile,
-    EDIT_PROFILE_VALUE, AWAIT_PHONE_SHARE,
+    profile_receive_phone_share, profile_receive_location_share, cancel_profile,
+    EDIT_PROFILE_VALUE, AWAIT_PHONE_SHARE, AWAIT_LOCATION_SHARE,
 )
 from handlers.withdraw import (
     nav_withdraw, pick_method, use_saved_address, enter_destination, cancel_withdraw,
@@ -458,6 +458,11 @@ def main():
             ],
             AWAIT_PHONE_SHARE: [
                 MessageHandler(filters.CONTACT, profile_receive_phone_share),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, profile_receive_value),
+                CommandHandler("cancel", cancel_profile),
+            ],
+            AWAIT_LOCATION_SHARE: [
+                MessageHandler(filters.LOCATION, profile_receive_location_share),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, profile_receive_value),
                 CommandHandler("cancel", cancel_profile),
             ],
