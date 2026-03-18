@@ -59,6 +59,7 @@ def _profile_text(user, profile, w_stats=None) -> str:
         f"👤 *Your Profile*\n",
         f"📛 *Name:* {name}",
         f"🆔 *Username:* {uname}",
+        f"🆔 *User ID:* `{user['user_id']}`",
         f"📅 *Member since:* {joined}",
         f"💰 *Balance:* {fmt_balance(user['balance'])}",
         f"✅ *Paid Withdrawals:* {fmt_balance(paid)}",
@@ -68,7 +69,13 @@ def _profile_text(user, profile, w_stats=None) -> str:
 
     for col, emoji, label, _ in PROFILE_FIELDS:
         val = profile.get(col) if profile else None
-        masked = clean_md(_mask(val)) if val else "_not set_"
+        if not val:
+            masked = "_not set_"
+        elif col == "location" and (val.startswith("http://") or val.startswith("https://")):
+            # Make URL clickable and don't mask it
+            masked = f"[📍 Open Maps]({val})"
+        else:
+            masked = clean_md(_mask(val))
         lines.append(f"{emoji} *{label}:* {masked}")
 
     return "\n".join(lines)
