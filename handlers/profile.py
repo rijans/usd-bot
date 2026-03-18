@@ -12,7 +12,7 @@ from telegram import (
 from telegram.ext import ContextTypes, ConversationHandler
 
 import core.db as db
-from core.ui import fmt_balance, BOT_USERNAME
+from core.ui import fmt_balance, BOT_USERNAME, clean_md
 
 # ConversationHandler state
 EDIT_PROFILE_VALUE = 50   # Waiting for user to type a new value
@@ -47,8 +47,8 @@ def _mask(value: str) -> str:
 
 def _profile_text(user, profile, w_stats=None) -> str:
     joined = user["joined_at"].strftime("%b %Y") if user.get("joined_at") else "?"
-    name   = user.get("full_name", "?")
-    uname  = f"@{user['username']}" if user.get("username") else "—"
+    name   = clean_md(user.get("full_name", "?"))
+    uname  = clean_md(f"@{user['username']}") if user.get("username") else "—"
     
     paid = w_stats["paid"] if w_stats else 0.0
     rejected = w_stats["rejected"] if w_stats else 0.0
@@ -59,7 +59,6 @@ def _profile_text(user, profile, w_stats=None) -> str:
         f"🆔 *Username:* {uname}",
         f"📅 *Member since:* {joined}",
         f"💰 *Balance:* {fmt_balance(user['balance'])}",
-        f"👥 *Total Invites:* {user['total_invites']}",
         f"✅ *Paid Withdrawals:* {fmt_balance(paid)}",
         f"❌ *Rejected Withdrawals:* {fmt_balance(rejected)}",
         f"\n━━━━━━━━━━━━━━\n",
@@ -67,7 +66,7 @@ def _profile_text(user, profile, w_stats=None) -> str:
 
     for col, emoji, label, _ in PROFILE_FIELDS:
         val = profile.get(col) if profile else None
-        masked = _mask(val) if val else "_not set_"
+        masked = clean_md(_mask(val)) if val else "_not set_"
         lines.append(f"{emoji} *{label}:* {masked}")
 
     return "\n".join(lines)

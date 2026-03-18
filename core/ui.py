@@ -58,6 +58,15 @@ def progress_bar(done: int, total: int, width: int = 8) -> str:
     return "▓" * filled + "░" * (width - filled)
 
 
+def clean_md(text: str) -> str:
+    """Escapes common Markdown (V1) characters like *, _, `, [."""
+    if not text:
+        return ""
+    for char in ["*", "_", "`", "["]:
+        text = text.replace(char, f"\\{char}")
+    return text
+
+
 def mask_id(id_val: object) -> str:
     """Masks a Telegram ID for privacy (e.g., 12345678 -> 123***678)."""
     id_str = str(id_val)
