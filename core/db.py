@@ -152,8 +152,9 @@ async def init_schema():
         # Add reject_reason column for backward compatibility
         await conn.execute("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS reject_reason TEXT;")
         
-        # Add country column for backward compatibility
+        # Add country and location columns for backward compatibility
         await conn.execute("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS country TEXT;")
+        await conn.execute("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS location TEXT;")
         
         # Insert defaults if empty
         await conn.execute(
