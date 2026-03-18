@@ -57,7 +57,6 @@ async def _render_refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💡 Share this link with friends! When they join and complete all tasks, you earn *{fmt_balance(current_rate)}* automatically.\n"
         f"{rate_info}\n\n"
         f"📊 *Your Stats:*\n"
-        f"✅ Total Invites: *{user['total_invites']}*\n"
         f"💰 Balance: *{fmt_balance(user['balance'])}*\n"
         f"🏆 Weekly Rank: *#{weekly_rank}*\n\n"
         f"🔥 *Top 3 This Week:*\n"
@@ -65,7 +64,7 @@ async def _render_refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i, u in enumerate(top, 1):
         medals = ["🥇", "🥈", "🥉"]
         name = (u["full_name"] or "User")[:20]
-        text += f"{medals[i-1]} {name} — {u['total_invites']} invites\n"
+        text += f"{medals[i-1]} {name}\n"
 
     share_text = (
         f"💰 Join {BOT_NAME} and earn money easily!\n"

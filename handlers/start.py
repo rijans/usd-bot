@@ -6,7 +6,7 @@ from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 import core.db as db
-from core.ui import nav_keyboard, BOT_NAME, fmt_balance
+from core.ui import nav_keyboard, BOT_NAME, fmt_balance, mask_id
 
 
 # Persistent bottom keyboard - always visible below the chat input
@@ -50,6 +50,22 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="Markdown"
             )
         except Exception:
+            pass
+
+    # Notify Referrer if it's a new user
+    if is_new and referred_by:
+        try:
+            # Mask the new user's ID for privacy
+            masked_id = mask_id(user.id)
+            await context.bot.send_message(
+                referred_by,
+                f"👤 *New Referral!*\n\n"
+                f"User `{masked_id}` joined via your link.\n"
+                f"You will receive your reward once they complete all tasks! 🚀",
+                parse_mode="Markdown"
+            )
+        except Exception:
+            # Referrer might have blocked the bot or something else
             pass
 
     await _send_home(update, record, is_new=is_new)
@@ -109,8 +125,7 @@ async def _send_home(update: Update, record, is_new=False):
         ref_threshold = await db.get_setting("referral_reward_threshold", "5")
         
         text += (
-            f"💰 Balance: *{fmt_balance(record['balance'])}*\n"
-            f"👥 Total Invites: *{record['total_invites']}*\n\n"
+            f"💰 Balance: *{fmt_balance(record['balance'])}*\n\n"
             f"📖 *How to earn:*\n"
             f"• 🎉 {fmt_balance(signup_amount)} welcome bonus (instant!)\n"
             f"• 📋 {fmt_balance(task_amount)} per task completed\n"
@@ -153,8 +168,7 @@ async def _edit_home(query, record):
         ref_threshold = await db.get_setting("referral_reward_threshold", "5")
         
         text += (
-            f"💰 Balance: *{fmt_balance(record['balance'])}*\n"
-            f"👥 Total Invites: *{record['total_invites']}*\n\n"
+            f"💰 Balance: *{fmt_balance(record['balance'])}*\n\n"
             f"📖 *How to earn:*\n"
             f"• 🎉 {fmt_balance(signup_amount)} welcome bonus\n"
             f"• 📋 {fmt_balance(task_amount)} per task completed\n"

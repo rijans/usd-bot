@@ -1067,3 +1067,25 @@ async def get_lucky_draw_entry_history(limit: int = 20) -> list:
             limit
         )
 
+
+async def get_growth_stats(days: int = 14) -> dict:
+    """Return join counts and task completion counts per day for the last N days."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        joins = await conn.fetch(
+            """SELECT DATE(joined_at) as day, COUNT(*) as count 
+               FROM users WHERE joined_at >= CURRENT_DATE - $1 * INTERVAL '1 day' AND user_id > 0
+               GROUP BY day ORDER BY day""",
+            days
+        )
+        tasks = await conn.fetch(
+            """SELECT DATE(completed_at) as day, COUNT(*) as count 
+               FROM task_completions WHERE completed_at >= CURRENT_DATE - $1 * INTERVAL '1 day'
+               GROUP BY day ORDER BY day""",
+            days
+        )
+        return {
+            "joins": {r["day"]: r["count"] for r in joins},
+            "tasks": {r["day"]: r["count"] for r in tasks}
+        }
+

@@ -16,6 +16,7 @@ ConversationHandler states:
   BROADCAST_TEXT    → admin types broadcast message
 """
 import os
+from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler, filters, MessageHandler, CommandHandler
 
@@ -87,6 +88,7 @@ def _admin_keyboard():
         [InlineKeyboardButton("✉️ Support Tickets", callback_data="adm:tickets")],
         [InlineKeyboardButton("🎰 Lucky Draw Stats", callback_data="adm:luckydraw")],
         [InlineKeyboardButton("⚙️ Settings", callback_data="adm:settings")],
+        [InlineKeyboardButton("📈 Growth Stats", callback_data="adm:growth_stats")],
         [InlineKeyboardButton("📊 Full Stats", callback_data="adm:stats")],
     ])
 
@@ -98,8 +100,13 @@ def _admin_keyboard():
 @require_admin
 async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     data = query.data
+
+    if data == "adm:growth_stats":
+        await _show_growth_stats(query)
+        return ConversationHandler.END
+
+    await query.answer()
 
     # ── Task list ─────────────────────────────────────────────────────────────
     if data == "adm:tasks":
@@ -404,6 +411,9 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         rs = await db.get_setting("referral_reward_secondary", "0.05")
         rt = await db.get_setting("referral_reward_threshold", "5")
         
+        notify_admin = await db.get_setting("notify_admin_on_task_done", "1")
+        notify_label = "🔔 Admin Alerts: ON" if notify_admin == "1" else "🔕 Admin Alerts: OFF"
+
         text = (
             f"⚙️ *Bot Settings*\n\n"
             f"🎉 Signup Bonus: `{fmt_balance(signup)}`\n"
@@ -427,10 +437,19 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
              InlineKeyboardButton("👥 Ref Secondary", callback_data="adm:edit_set:referral_reward_secondary")],
             [InlineKeyboardButton("👥 Ref Threshold", callback_data="adm:edit_set:referral_reward_threshold")],
             [InlineKeyboardButton(fake_label, callback_data="adm:toggle_fake")],
+            [InlineKeyboardButton(notify_label, callback_data="adm:toggle_admin_notify")],
             [InlineKeyboardButton("⬅️ Back", callback_data="adm:back")]
         ])
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
         return ConversationHandler.END
+
+    elif data == "adm:toggle_admin_notify":
+        current = await db.get_setting("notify_admin_on_task_done", "1")
+        new_val = "0" if current == "1" else "1"
+        await db.set_setting("notify_admin_on_task_done", new_val)
+        await query.answer(f"Admin alerts {'enabled' if new_val == '1' else 'disabled'}!")
+        query.data = "adm:settings"
+        return await admin_callback(update, context)
 
     elif data == "adm:luckydraw":
         stats = await db.get_lucky_draw_admin_stats()
@@ -1001,3 +1020,41 @@ async def admin_ticket_reply_text(update: Update, context: ContextTypes.DEFAULT_
         effective_user = update.effective_user
 
     return await admin_callback(FakeUpdate(), context)
+
+async def _show_growth_stats(query):
+    stats = await db.get_growth_stats(days=14)
+    joins = stats["joins"]
+    tasks = stats["tasks"]
+    
+    # Generate a sorted list of last 14 days
+    today = datetime.now().date()
+    days = [(today - timedelta(days=i)) for i in range(13, -1, -1)]
+    
+    lines = ["📈 *Growth Stats (Last 14 Days)*\n"]
+    lines.append("`Date   | Joins | Tasks`")
+    lines.append("`-----------------------`")
+    
+    total_j = total_t = 0
+    for d in days:
+        j_count = joins.get(d, 0)
+        t_count = tasks.get(d, 0)
+        total_j += j_count
+        total_t += t_count
+        
+        date_str = d.strftime("%b %d")
+        lines.append(f"`{date_str} | {j_count:5} | {t_count:5}`")
+        
+    lines.append("`-----------------------`")
+    lines.append(f"`TOTAL  | {total_j:5} | {total_t:5}`")
+    
+    text = "\n".join(lines)
+    text += (
+        "\n\n*Activity Summary:*\n"
+        f"👥 New Users: *{total_j}*\n"
+        f"✅ Tasks Done: *{total_t}*\n"
+    )
+    
+    await query.edit_message_text(
+        text, parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="adm:back")]])
+    )

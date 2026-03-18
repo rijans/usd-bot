@@ -7,11 +7,12 @@ User flow:
   3. Tap "✅ I Joined" → bot calls get_chat_member() to verify
   4. If verified → mark complete, check if ALL done → unlock + notify referrer
 """
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 import core.db as db
-from core.ui import nav_keyboard, check_all_tasks, progress_bar, fmt_balance
+from core.ui import nav_keyboard, check_all_tasks, progress_bar, fmt_balance, mask_id
 
 
 async def nav_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -231,13 +232,29 @@ async def task_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Notify referrer
         if user["referred_by"] and ref_amt > 0:
             try:
+                masked_name = f"User {mask_id(user_id)}"
                 await context.bot.send_message(
                     user["referred_by"],
                     f"🎉 *Referral Reward!*\n\n"
-                    f"Your referral *{user['full_name']}* completed all tasks!\n"
+                    f"Your referral *{masked_name}* completed all tasks!\n"
                     f"💰 *+{fmt_balance(ref_amt)}* has been added to your balance.",
                     parse_mode="Markdown",
                 )
+            except Exception:
+                pass
+
+        # Admin Notification for milestone
+        notify_admin = await db.get_setting("notify_admin_on_task_done", "1")
+        if notify_admin == "1":
+            try:
+                admin_ids = [int(i.strip()) for i in os.environ.get("ADMIN_IDS", "").split(",") if i.strip()]
+                for admin_id in admin_ids:
+                    await context.bot.send_message(
+                        admin_id,
+                        f"🔔 *Admin Alert: Task Milestone*\n\n"
+                        f"User: *{user['full_name']}* (`{user_id}`)\n"
+                        f"Status: ✅ Completed all tasks."
+                    )
             except Exception:
                 pass
 

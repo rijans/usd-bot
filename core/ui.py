@@ -58,6 +58,16 @@ def progress_bar(done: int, total: int, width: int = 8) -> str:
     return "▓" * filled + "░" * (width - filled)
 
 
+def mask_id(id_val: object) -> str:
+    """Masks a Telegram ID for privacy (e.g., 12345678 -> 123***678)."""
+    id_str = str(id_val)
+    if not id_str:
+        return ""
+    if len(id_str) <= 4:
+        return "***"
+    return f"{id_str[:3]}***{id_str[-3:]}"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Membership check
 # ─────────────────────────────────────────────────────────────────────────────

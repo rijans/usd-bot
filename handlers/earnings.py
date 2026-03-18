@@ -60,8 +60,7 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💰 *Earnings Dashboard*\n\n"
         f"💵 Balance: *{fmt_balance(user['balance'])}*\n"
         f"📊 Overall Rank: *#{rank}*\n"
-        f"🏆 Weekly Invite Rank: *#{weekly_rank}*\n"
-        f"👥 Total Invites: *{user['total_invites']}*\n\n"
+        f"🏆 Weekly Invite Rank: *#{weekly_rank}*\n\n"
         f"🎰 *Daily Lucky Draw:* Enter to win big cash prizes! ($200/$70/$30)\n\n"
     )
 
@@ -80,7 +79,7 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for i, u in enumerate(top, 1):
             medal = MEDALS[i - 1] if i <= 3 else f"{i}."
             name = (u["full_name"] or "User")[:20]
-            text += f"{medal} {name} — *{u['total_invites']} inv* | 💵 {fmt_balance(u['balance'])}\n"
+            text += f"{medal} {name} — 💵 {fmt_balance(u['balance'])}\n"
 
         buttons = []
         if daily_available:
@@ -162,11 +161,10 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         medal = MEDALS[i - 1] if i <= 3 else f"{i}."
         prize = {1: "$10", 2: "$10", 3: "$10"}.get(i, "$5" if i <= 10 else "$3")
         name = (u["full_name"] or "User")[:20]
-        text += f"{medal} {name} — *{u['total_invites']} inv* | 💵 {fmt_balance(u['balance'])} (Prize: {prize})\n"
+        text += f"{medal} {name} — 💵 {fmt_balance(u['balance'])} (Prize: {prize})\n"
 
     text += (
-        f"\n📊 *Your Position:* #{weekly_rank}\n"
-        f"👥 Your Invites: *{user['total_invites'] if user else 0}*\n\n"
+        f"\n📊 *Your Position:* #{weekly_rank}\n\n"
         f"🏆 *Prizes:*\n"
         f"🥇 1st–3rd: $10 each\n"
         f"🥈 4th–10th: $5 each\n"
