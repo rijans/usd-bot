@@ -46,7 +46,7 @@ def admin_ids() -> list[int]:
 
 
 def require_admin(func):
-    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         uid = update.effective_user.id
         if uid not in admin_ids():
             if update.message:
@@ -54,7 +54,7 @@ def require_admin(func):
             elif update.callback_query:
                 await update.callback_query.answer("⛔ Unauthorized.", show_alert=True)
             return ConversationHandler.END
-        return await func(update, context)
+        return await func(update, context, *args, **kwargs)
     wrapper.__name__ = func.__name__
     return wrapper
 
@@ -165,9 +165,9 @@ async def _show_paginated_users(query, page: int = 0, filter_type: str = "all"):
 
 
 @require_admin
-async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, override_data: str = None):
     query = update.callback_query
-    data = query.data
+    data = override_data or query.data
 
     if data == "adm:growth_stats":
         await _show_growth_stats(query)
@@ -233,16 +233,14 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = await db.toggle_task(task_id)
         state = "activated ✅" if result["active"] else "deactivated ❌"
         await query.answer(f"Task {state}!", show_alert=True)
-        query.data = f"adm:task_detail:{task_id}"
-        return await admin_callback(update, context)
+        return await admin_callback(update, context, override_data=f"adm:task_detail:{task_id}")
 
     # ── Delete task ───────────────────────────────────────────────────────────
     elif data.startswith("adm:delete:"):
         task_id = int(data.split(":")[2])
         ok = await db.delete_task(task_id)
         await query.answer("Deleted!" if ok else "Failed.", show_alert=True)
-        query.data = "adm:tasks"
-        return await admin_callback(update, context)
+        return await admin_callback(update, context, override_data="adm:tasks")
 
     # ── Edit task fields ──────────────────────────────────────────────────────
     elif data.startswith("adm:edit_task_title:"):
@@ -392,8 +390,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ticket_id = int(data.split(":")[2])
         await db.close_ticket(ticket_id)
         await query.answer("✅ Ticket closed!", show_alert=True)
-        query.data = "adm:tickets"
-        return await admin_callback(update, context)
+        return await admin_callback(update, context, override_data="adm:tickets")
 
     elif data.startswith("adm:ticket_reply:"):
         ticket_id = int(data.split(":")[2])
@@ -519,8 +516,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_val = "0" if current == "1" else "1"
         await db.set_setting("notify_admin_on_task_done", new_val)
         await query.answer(f"Admin alerts {'enabled' if new_val == '1' else 'disabled'}!")
-        query.data = "adm:settings"
-        return await admin_callback(update, context)
+        return await admin_callback(update, context, override_data="adm:settings")
 
     elif data == "adm:luckydraw":
         stats = await db.get_lucky_draw_admin_stats()
@@ -571,8 +567,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_val = "0" if current == "1" else "1"
         await db.set_setting("show_fake_leaders", new_val)
         await query.answer(f"Fake leaders {'enabled' if new_val == '1' else 'disabled'}!")
-        query.data = "adm:settings"
-        return await admin_callback(update, context)
+        return await admin_callback(update, context, override_data="adm:settings")
 
     elif data.startswith("adm:edit_set:"):
         key = data.split(":")[2]
