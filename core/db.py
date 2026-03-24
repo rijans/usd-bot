@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 
 CREATE TABLE IF NOT EXISTS task_completions (
-    user_id         BIGINT      NOT NULL REFERENCES users(user_id),
+    user_id         BIGINT      NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     task_id         INT         NOT NULL REFERENCES tasks(id),
     completed_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, task_id)
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS task_completions (
 
 CREATE TABLE IF NOT EXISTS withdrawals (
     id              SERIAL      PRIMARY KEY,
-    user_id         BIGINT      NOT NULL REFERENCES users(user_id),
+    user_id         BIGINT      NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     amount          NUMERIC(10,2) NOT NULL,
     method          TEXT        NOT NULL,
     destination     TEXT        NOT NULL,
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS withdrawals (
 
 CREATE TABLE IF NOT EXISTS transactions (
     id              SERIAL      PRIMARY KEY,
-    user_id         BIGINT      NOT NULL REFERENCES users(user_id),
+    user_id         BIGINT      NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     amount          NUMERIC(10,2) NOT NULL,
     type            TEXT        NOT NULL, -- e.g., 'signup', 'task', 'referral', 'daily_bonus'
     related_to      TEXT,       -- e.g., user_id of referral, or task_id
@@ -155,6 +155,18 @@ async def init_schema():
         # Add country and location columns for backward compatibility
         await conn.execute("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS country TEXT;")
         await conn.execute("ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS location TEXT;")
+        
+        # Add CASCADE constraints for backward compatibility (Fix ForeignKeyViolationError)
+        await conn.execute("""
+            ALTER TABLE task_completions DROP CONSTRAINT IF EXISTS task_completions_user_id_fkey;
+            ALTER TABLE task_completions ADD CONSTRAINT task_completions_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE;
+            
+            ALTER TABLE withdrawals DROP CONSTRAINT IF EXISTS withdrawals_user_id_fkey;
+            ALTER TABLE withdrawals ADD CONSTRAINT withdrawals_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE;
+            
+            ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_user_id_fkey;
+            ALTER TABLE transactions ADD CONSTRAINT transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE;
+        """)
         
         # Insert defaults if empty
         await conn.execute(

@@ -491,7 +491,10 @@ def main():
             LOOKUP_USER:      [MessageHandler(filters.TEXT & ~filters.COMMAND, lookup_user_text)],
             ADMIN_REPLY_TICKET:[MessageHandler(filters.TEXT & ~filters.COMMAND, admin_ticket_reply_text)],
         },
-        fallbacks=[CommandHandler("cancel", cancel)],
+        fallbacks=[
+            CommandHandler("cancel", cancel),
+            CommandHandler("admin", cmd_admin)
+        ],
         per_message=False,
     )
     app.add_handler(admin_conv)
