@@ -799,6 +799,24 @@ async def update_group_interval(chat_id: int, interval_hours: int) -> None:
             chat_id, interval_hours
         )
 
+async def get_paginated_groups(limit: int, offset: int) -> list[asyncpg.Record]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetch(
+            """SELECT g.*, u.full_name, u.username
+               FROM promoted_groups g
+               JOIN users u ON g.owner_id = u.user_id
+               ORDER BY g.chat_id DESC
+               LIMIT $1 OFFSET $2""",
+            limit, offset
+        )
+
+async def get_paginated_groups_count() -> int:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchval("SELECT COUNT(*) FROM promoted_groups")
+
+
 
 async def toggle_group(chat_id: int) -> Optional[asyncpg.Record]:
     pool = await get_pool()

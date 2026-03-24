@@ -89,7 +89,8 @@ def _admin_keyboard():
          InlineKeyboardButton("🎰 Lucky Draw", callback_data="adm:luckydraw")],
         [InlineKeyboardButton("⚙️ Settings", callback_data="adm:settings"),
          InlineKeyboardButton("📈 Growth Stats", callback_data="adm:growth_stats")],
-        [InlineKeyboardButton("📊 Full Stats", callback_data="adm:stats")],
+        [InlineKeyboardButton("📊 Full Stats", callback_data="adm:stats"),
+         InlineKeyboardButton("📢 Promoted Groups", callback_data="adm:groups")],
     ])
 
 
@@ -161,6 +162,50 @@ async def _show_paginated_users(query, page: int = 0, filter_type: str = "all"):
     ])
     buttons.append([InlineKeyboardButton("⬅️ Back to Admin", callback_data="adm:back")])
     
+    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
+
+
+async def _show_paginated_groups(query, context, page: int = 0):
+    per_page = 10
+    total_groups = await db.get_paginated_groups_count()
+    total_pages = max(1, math.ceil(total_groups / per_page))
+    
+    if page >= total_pages: page = total_pages - 1
+    if page < 0: page = 0
+        
+    offset = page * per_page
+    groups = await db.get_paginated_groups(limit=per_page, offset=offset)
+    
+    text = (
+        f"📢 *Promoted Telegram Groups*\n\n"
+        f"Groups where the bot is added as an admin for auto-promotion.\n"
+        f"Click a group to view owner details and get its invite link.\n\n"
+    )
+    
+    buttons = []
+    if not groups:
+        text += "_No groups registered yet._\n"
+    else:
+        for g in groups:
+            chat_id = g["chat_id"]
+            title = (g["title"] or f"Group {chat_id}")[:25]
+            owner_name = (g.get("full_name") or str(g["owner_id"]))[:15]
+            status = "🟢" if g["active"] else "🔴"
+            
+            buttons.append([InlineKeyboardButton(f"{status} {title} | {owner_name}", callback_data=f"adm:gdetail:{chat_id}")])
+            
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"adm:glist:{page-1}"))
+    nav_row.append(InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="ignore"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton("Next ➡️", callback_data=f"adm:glist:{page+1}"))
+    if nav_row:
+        buttons.append(nav_row)
+        
+    buttons.append([InlineKeyboardButton("⬅️ Back to Admin", callback_data="adm:back")])
+    
+    context.user_data["adm_glist_page"] = page
     await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
 
 
@@ -407,6 +452,55 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
         await _show_paginated_users(query, page=0, filter_type="all")
         return LOOKUP_USER
         
+    # ── Promoted Groups ───────────────────────────────────────────────────────
+    elif data == "adm:groups":
+        await _show_paginated_groups(query, context, page=0)
+        return ConversationHandler.END
+        
+    elif data.startswith("adm:glist:"):
+        page = int(data.split(":")[2])
+        await _show_paginated_groups(query, context, page)
+        return ConversationHandler.END
+        
+    elif data.startswith("adm:gdetail:"):
+        chat_id = int(data.split(":")[2])
+        group = await db.get_group(chat_id)
+        if not group:
+            await query.answer("Group not found in database.", show_alert=True)
+            return ConversationHandler.END
+            
+        owner = await db.get_user(group["owner_id"])
+        owner_name = owner["full_name"] if owner else str(group["owner_id"])
+        
+        # Try to dynamically get invite link
+        link = "Not available"
+        try:
+            link = await context.bot.export_chat_invite_link(chat_id)
+        except Exception as e:
+            link = f"Bot lacks invite permissions."
+            
+        status = "🟢 Active" if group["active"] else "🔴 Paused"
+        interval = f"{group['interval_hours']} hours"
+        
+        text = (
+            f"📢 *Group Detail*\n\n"
+            f"🏷 *Title:* {group['title'] or 'Unknown'}\n"
+            f"🆔 *Chat ID:* `{chat_id}`\n"
+            f"🔗 *Invite Link:* {link}\n\n"
+            f"👤 *Owner:* {owner_name}\n"
+            f"🆔 *Owner ID:* `{group['owner_id']}`\n\n"
+            f"⚙️ *Settings:*\n"
+            f"Status: {status}\n"
+            f"Interval: {interval}\n"
+        )
+        
+        page = context.user_data.get("adm_glist_page", 0)
+        buttons = [
+            [InlineKeyboardButton("⬅️ Back to Groups", callback_data=f"adm:glist:{page}")]
+        ]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
+        return ConversationHandler.END
+
     # ── Lookup User List Pagination ──────────────────────────────────────────
     elif data.startswith("adm:ulist:"):
         parts = data.split(":")
