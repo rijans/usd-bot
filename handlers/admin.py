@@ -81,14 +81,14 @@ async def cmd_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def _admin_keyboard():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📋 Manage Tasks", callback_data="adm:tasks")],
-        [InlineKeyboardButton("💸 Withdrawals", callback_data="adm:withdrawals")],
-        [InlineKeyboardButton("📢 Broadcast", callback_data="adm:broadcast")],
-        [InlineKeyboardButton("🔍 Lookup User", callback_data="adm:lookup")],
-        [InlineKeyboardButton("✉️ Support Tickets", callback_data="adm:tickets")],
-        [InlineKeyboardButton("🎰 Lucky Draw Stats", callback_data="adm:luckydraw")],
-        [InlineKeyboardButton("⚙️ Settings", callback_data="adm:settings")],
-        [InlineKeyboardButton("📈 Growth Stats", callback_data="adm:growth_stats")],
+        [InlineKeyboardButton("📋 Manage Tasks", callback_data="adm:tasks"),
+         InlineKeyboardButton("💸 Withdrawals", callback_data="adm:withdrawals")],
+        [InlineKeyboardButton("📢 Broadcast", callback_data="adm:broadcast"),
+         InlineKeyboardButton("🔍 Lookup User", callback_data="adm:lookup")],
+        [InlineKeyboardButton("✉️ Support Tickets", callback_data="adm:tickets"),
+         InlineKeyboardButton("🎰 Lucky Draw", callback_data="adm:luckydraw")],
+        [InlineKeyboardButton("⚙️ Settings", callback_data="adm:settings"),
+         InlineKeyboardButton("📈 Growth Stats", callback_data="adm:growth_stats")],
         [InlineKeyboardButton("📊 Full Stats", callback_data="adm:stats")],
     ])
 
@@ -96,6 +96,73 @@ def _admin_keyboard():
 # ─────────────────────────────────────────────────────────────────────────────
 # Admin callbacks (entry point for ConversationHandler)
 # ─────────────────────────────────────────────────────────────────────────────
+
+import math
+
+async def _show_paginated_users(query, page: int = 0, filter_type: str = "all"):
+    per_page = 10
+    total_users = await db.get_paginated_users_count(filter_type)
+    total_pages = max(1, math.ceil(total_users / per_page))
+    
+    if page >= total_pages: page = total_pages - 1
+    if page < 0: page = 0
+        
+    offset = page * per_page
+    users = await db.get_paginated_users(limit=per_page, offset=offset, filter_type=filter_type)
+    
+    filter_names = {
+        "all": "All Users",
+        "profile": "Configured Profiles",
+        "referrals": "Top Referrals",
+        "earnings": "Top Earners"
+    }
+    
+    text = (
+        f"🔍 *Lookup User Profile* ({filter_names.get(filter_type, 'All')})\n\n"
+        f"Send the *Telegram User ID* to look up a profile directly.\n"
+        f"Or click a user below:\n\n"
+        f"_(Type /cancel to abort)_"
+    )
+    
+    buttons = []
+    for u in users:
+        uid = u["user_id"]
+        name = str(u["full_name"])[:20]
+        stats_str = ""
+        if filter_type == "referrals":
+            stats_str = f" | {u['total_invites']} refs"
+        elif filter_type == "earnings":
+            stats_str = f" | {fmt_balance(u['balance'])}"
+        
+        # pass the page and filter in the context string so we can return here
+        buttons.append([InlineKeyboardButton(f"👤 {name}{stats_str}", callback_data=f"adm:prof:{uid}")])
+        
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("⬅️ Prev", callback_data=f"adm:ulist:{page-1}:{filter_type}"))
+    nav_row.append(InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="ignore"))
+    if page < total_pages - 1:
+        nav_row.append(InlineKeyboardButton("Next ➡️", callback_data=f"adm:ulist:{page+1}:{filter_type}"))
+    if nav_row:
+        buttons.append(nav_row)
+        
+    f1 = "✅ All" if filter_type == "all" else "All"
+    f2 = "✅ Profile" if filter_type == "profile" else "Profile"
+    f3 = "✅ Refs" if filter_type == "referrals" else "Refs"
+    f4 = "✅ Earn" if filter_type == "earnings" else "Earn"
+    
+    buttons.append([
+        InlineKeyboardButton(f1, callback_data=f"adm:ulist:0:all"),
+        InlineKeyboardButton(f2, callback_data=f"adm:ulist:0:profile"),
+    ])
+    buttons.append([
+        InlineKeyboardButton(f3, callback_data=f"adm:ulist:0:referrals"),
+        InlineKeyboardButton(f4, callback_data=f"adm:ulist:0:earnings"),
+    ])
+    buttons.append([InlineKeyboardButton("⬅️ Back to Admin", callback_data="adm:back")])
+    
+    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
+
 
 @require_admin
 async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -339,13 +406,17 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Lookup User ───────────────────────────────────────────────────────────
     elif data == "adm:lookup":
-        context.user_data["adm_prev_menu"] = "adm:back"
-        await query.edit_message_text(
-            "🔍 *Lookup User Profile*\n\n"
-            "Send the *Telegram User ID* (numbers only) to look up their profile.\n\n"
-            "_(Type /cancel to abort)_",
-            parse_mode="Markdown"
-        )
+        context.user_data["adm_prev_menu"] = "adm:lookup"
+        await _show_paginated_users(query, page=0, filter_type="all")
+        return LOOKUP_USER
+        
+    # ── Lookup User List Pagination ──────────────────────────────────────────
+    elif data.startswith("adm:ulist:"):
+        parts = data.split(":")
+        page = int(parts[2])
+        filter_type = parts[3]
+        context.user_data["adm_prev_menu"] = data
+        await _show_paginated_users(query, page=page, filter_type=filter_type)
         return LOOKUP_USER
 
     # ── View Profile (read-only) ──────────────────────────────────────────────

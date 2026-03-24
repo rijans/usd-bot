@@ -488,7 +488,10 @@ def main():
             EDIT_TASK_TITLE:  [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_task_title)],
             EDIT_TASK_CHAT:   [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_task_chat)],
             EDIT_TASK_LINK:   [MessageHandler(filters.TEXT & ~filters.COMMAND, edit_task_link)],
-            LOOKUP_USER:      [MessageHandler(filters.TEXT & ~filters.COMMAND, lookup_user_text)],
+            LOOKUP_USER:      [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, lookup_user_text),
+                CallbackQueryHandler(admin_callback, pattern="^adm:")
+            ],
             ADMIN_REPLY_TICKET:[MessageHandler(filters.TEXT & ~filters.COMMAND, admin_ticket_reply_text)],
         },
         fallbacks=[

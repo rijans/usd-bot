@@ -430,6 +430,46 @@ async def get_all_user_ids() -> list[int]:
         return [r["user_id"] for r in rows]
 
 
+async def get_paginated_users(limit: int, offset: int, filter_type: str = "all") -> list[asyncpg.Record]:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        if filter_type == "profile":
+            return await conn.fetch(
+                """SELECT u.* FROM users u 
+                   JOIN user_profiles p ON u.user_id = p.user_id 
+                   WHERE u.user_id > 0 
+                   ORDER BY u.joined_at DESC LIMIT $1 OFFSET $2""",
+                limit, offset
+            )
+        elif filter_type == "referrals":
+            return await conn.fetch(
+                "SELECT * FROM users WHERE user_id > 0 ORDER BY total_invites DESC, joined_at DESC LIMIT $1 OFFSET $2",
+                limit, offset
+            )
+        elif filter_type == "earnings":
+            return await conn.fetch(
+                "SELECT * FROM users WHERE user_id > 0 ORDER BY balance DESC, joined_at DESC LIMIT $1 OFFSET $2",
+                limit, offset
+            )
+        else:
+            # Default 'all'
+            return await conn.fetch(
+                "SELECT * FROM users WHERE user_id > 0 ORDER BY joined_at DESC LIMIT $1 OFFSET $2",
+                limit, offset
+            )
+
+async def get_paginated_users_count(filter_type: str = "all") -> int:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        if filter_type == "profile":
+            return await conn.fetchval(
+                "SELECT COUNT(*) FROM users u JOIN user_profiles p ON u.user_id = p.user_id WHERE u.user_id > 0"
+            )
+        else:
+            return await conn.fetchval("SELECT COUNT(*) FROM users WHERE user_id > 0")
+
+
+
 async def get_stats() -> dict:
     pool = await get_pool()
     async with pool.acquire() as conn:
