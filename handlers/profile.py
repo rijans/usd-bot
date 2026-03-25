@@ -38,6 +38,134 @@ PROFILE_FIELDS = [
 FIELD_BY_KEY = {f[0]: f for f in PROFILE_FIELDS}
 
 
+# ── Full country list (all UN-recognized + common territories) ────────────────
+ALL_COUNTRIES = [
+    "🇦🇫 Afghanistan", "🇦🇱 Albania", "🇩🇿 Algeria", "🇦🇩 Andorra", "🇦🇴 Angola",
+    "🇦🇬 Antigua & Barbuda", "🇦🇷 Argentina", "🇦🇲 Armenia", "🇦🇺 Australia", "🇦🇹 Austria",
+    "🇦🇿 Azerbaijan", "🇧🇸 Bahamas", "🇧🇭 Bahrain", "🇧🇩 Bangladesh", "🇧🇧 Barbados",
+    "🇧🇾 Belarus", "🇧🇪 Belgium", "🇧🇿 Belize", "🇧🇯 Benin", "🇧🇹 Bhutan",
+    "🇧🇴 Bolivia", "🇧🇦 Bosnia & Herzegovina", "🇧🇼 Botswana", "🇧🇷 Brazil", "🇧🇳 Brunei",
+    "🇧🇬 Bulgaria", "🇧🇫 Burkina Faso", "🇧🇮 Burundi", "🇨🇻 Cape Verde", "🇰🇭 Cambodia",
+    "🇨🇲 Cameroon", "🇨🇦 Canada", "🇨🇫 Central African Republic", "🇹🇩 Chad", "🇨🇱 Chile",
+    "🇨🇳 China", "🇨🇴 Colombia", "🇰🇲 Comoros", "🇨🇬 Congo", "🇨🇩 DR Congo",
+    "🇨🇷 Costa Rica", "🇭🇷 Croatia", "🇨🇺 Cuba", "🇨🇾 Cyprus", "🇨🇿 Czechia",
+    "🇩🇰 Denmark", "🇩🇯 Djibouti", "🇩🇲 Dominica", "🇩🇴 Dominican Republic", "🇪🇨 Ecuador",
+    "🇪🇬 Egypt", "🇸🇻 El Salvador", "🇬🇶 Equatorial Guinea", "🇪🇷 Eritrea", "🇪🇪 Estonia",
+    "🇸🇿 Eswatini", "🇪🇹 Ethiopia", "🇫🇯 Fiji", "🇫🇮 Finland", "🇫🇷 France",
+    "🇬🇦 Gabon", "🇬🇲 Gambia", "🇬🇪 Georgia", "🇩🇪 Germany", "🇬🇭 Ghana",
+    "🇬🇷 Greece", "🇬🇩 Grenada", "🇬🇹 Guatemala", "🇬🇳 Guinea", "🇬🇼 Guinea-Bissau",
+    "🇬🇾 Guyana", "🇭🇹 Haiti", "🇭🇳 Honduras", "🇭🇺 Hungary", "🇮🇸 Iceland",
+    "🇮🇳 India", "🇮🇩 Indonesia", "🇮🇷 Iran", "🇮🇶 Iraq", "🇮🇪 Ireland",
+    "🇮🇱 Israel", "🇮🇹 Italy", "🇯🇲 Jamaica", "🇯🇵 Japan", "🇯🇴 Jordan",
+    "🇰🇿 Kazakhstan", "🇰🇪 Kenya", "🇰🇮 Kiribati", "🇽🇰 Kosovo", "🇰🇼 Kuwait",
+    "🇰🇬 Kyrgyzstan", "🇱🇦 Laos", "🇱🇻 Latvia", "🇱🇧 Lebanon", "🇱🇸 Lesotho",
+    "🇱🇷 Liberia", "🇱🇾 Libya", "🇱🇮 Liechtenstein", "🇱🇹 Lithuania", "🇱🇺 Luxembourg",
+    "🇲🇬 Madagascar", "🇲🇼 Malawi", "🇲🇾 Malaysia", "🇲🇻 Maldives", "🇲🇱 Mali",
+    "🇲🇹 Malta", "🇲🇭 Marshall Islands", "🇲🇷 Mauritania", "🇲🇺 Mauritius", "🇲🇽 Mexico",
+    "🇫🇲 Micronesia", "🇲🇩 Moldova", "🇲🇨 Monaco", "🇲🇳 Mongolia", "🇲🇪 Montenegro",
+    "🇲🇦 Morocco", "🇲🇿 Mozambique", "🇲🇲 Myanmar", "🇳🇦 Namibia", "🇳🇷 Nauru",
+    "🇳🇵 Nepal", "🇳🇱 Netherlands", "🇳🇿 New Zealand", "🇳🇮 Nicaragua", "🇳🇪 Niger",
+    "🇳🇬 Nigeria", "🇰🇵 North Korea", "🇲🇰 North Macedonia", "🇳🇴 Norway", "🇴🇲 Oman",
+    "🇵🇰 Pakistan", "🇵🇼 Palau", "🇵🇸 Palestine", "🇵🇦 Panama", "🇵🇬 Papua New Guinea",
+    "🇵🇾 Paraguay", "🇵🇪 Peru", "🇵🇭 Philippines", "🇵🇱 Poland", "🇵🇹 Portugal",
+    "🇶🇦 Qatar", "🇷🇴 Romania", "🇷🇺 Russia", "🇷🇼 Rwanda", "🇰🇳 Saint Kitts & Nevis",
+    "🇱🇨 Saint Lucia", "🇻🇨 Saint Vincent & Grenadines", "🇼🇸 Samoa", "🇸🇲 San Marino",
+    "🇸🇹 Sao Tome & Principe", "🇸🇦 Saudi Arabia", "🇸🇳 Senegal", "🇷🇸 Serbia", "🇸🇨 Seychelles",
+    "🇸🇱 Sierra Leone", "🇸🇬 Singapore", "🇸🇰 Slovakia", "🇸🇮 Slovenia", "🇸🇧 Solomon Islands",
+    "🇸🇴 Somalia", "🇿🇦 South Africa", "🇸🇸 South Sudan", "🇪🇸 Spain", "🇱🇰 Sri Lanka",
+    "🇸🇩 Sudan", "🇸🇷 Suriname", "🇸🇪 Sweden", "🇨🇭 Switzerland", "🇸🇾 Syria",
+    "🇹🇼 Taiwan", "🇹🇯 Tajikistan", "🇹🇿 Tanzania", "🇹🇭 Thailand", "🇹🇱 Timor-Leste",
+    "🇹🇬 Togo", "🇹🇴 Tonga", "🇹🇹 Trinidad & Tobago", "🇹🇳 Tunisia", "🇹🇷 Turkey",
+    "🇹🇲 Turkmenistan", "🇹🇻 Tuvalu", "🇺🇬 Uganda", "🇺🇦 Ukraine", "🇦🇪 UAE",
+    "🇬🇧 UK", "🇺🇸 USA", "🇺🇾 Uruguay", "🇺🇿 Uzbekistan", "🇻🇺 Vanuatu",
+    "🇻🇦 Vatican City", "🇻🇪 Venezuela", "🇻🇳 Vietnam", "🇾🇪 Yemen", "🇿🇲 Zambia",
+    "🇿🇼 Zimbabwe",
+]
+
+# Phone country-code prefix → country label (longest prefix wins)
+_PHONE_PREFIX_MAP: list[tuple[str, str]] = [
+    ("+880", "🇧🇩 Bangladesh"), ("+91", "🇮🇳 India"), ("+92", "🇵🇰 Pakistan"),
+    ("+234", "🇳🇬 Nigeria"), ("+7", "🇷🇺 Russia"), ("+98", "🇮🇷 Iran"),
+    ("+86", "🇨🇳 China"), ("+55", "🇧🇷 Brazil"), ("+62", "🇮🇩 Indonesia"),
+    ("+90", "🇹🇷 Turkey"), ("+20", "🇪🇬 Egypt"), ("+27", "🇿🇦 South Africa"),
+    ("+52", "🇲🇽 Mexico"), ("+49", "🇩🇪 Germany"), ("+33", "🇫🇷 France"),
+    ("+39", "🇮🇹 Italy"), ("+34", "🇪🇸 Spain"), ("+971", "🇦🇪 UAE"),
+    ("+966", "🇸🇦 Saudi Arabia"), ("+44", "🇬🇧 UK"), ("+1", "🇺🇸 USA"),
+    ("+81", "🇯🇵 Japan"), ("+82", "🇰🇷 South Korea"), ("+63", "🇵🇭 Philippines"),
+    ("+84", "🇻🇳 Vietnam"), ("+60", "🇲🇾 Malaysia"), ("+66", "🇹🇭 Thailand"),
+    ("+380", "🇺🇦 Ukraine"), ("+994", "🇦🇿 Azerbaijan"), ("+998", "🇺🇿 Uzbekistan"),
+    ("+996", "🇰🇬 Kyrgyzstan"), ("+993", "🇹🇲 Turkmenistan"), ("+992", "🇹🇯 Tajikistan"),
+    ("+77", "🇰🇿 Kazakhstan"), ("+374", "🇦🇲 Armenia"), ("+995", "🇬🇪 Georgia"),
+    ("+961", "🇱🇧 Lebanon"), ("+962", "🇯🇴 Jordan"), ("+963", "🇸🇾 Syria"),
+    ("+964", "🇮🇶 Iraq"), ("+965", "🇰🇼 Kuwait"), ("+968", "🇴🇲 Oman"),
+    ("+974", "🇶🇦 Qatar"), ("+973", "🇧🇭 Bahrain"), ("+967", "🇾🇪 Yemen"),
+    ("+970", "🇵🇸 Palestine"), ("+972", "🇮🇱 Israel"), ("+212", "🇲🇦 Morocco"),
+    ("+216", "🇹🇳 Tunisia"), ("+213", "🇩🇿 Algeria"), ("+218", "🇱🇾 Libya"),
+    ("+249", "🇸🇩 Sudan"), ("+251", "🇪🇹 Ethiopia"), ("+254", "🇰🇪 Kenya"),
+    ("+255", "🇹🇿 Tanzania"), ("+256", "🇺🇬 Uganda"), ("+260", "🇿🇲 Zambia"),
+    ("+263", "🇿🇼 Zimbabwe"), ("+237", "🇨🇲 Cameroon"), ("+233", "🇬🇭 Ghana"),
+    ("+225", "🇨🇮 Ivory Coast"), ("+221", "🇸🇳 Senegal"), ("+243", "🇨🇩 DR Congo"),
+    ("+250", "🇷🇼 Rwanda"), ("+94", "🇱🇰 Sri Lanka"), ("+95", "🇲🇲 Myanmar"),
+    ("+977", "🇳🇵 Nepal"), ("+975", "🇧🇹 Bhutan"), ("+960", "🇲🇻 Maldives"),
+    ("+61", "🇦🇺 Australia"), ("+64", "🇳🇿 New Zealand"), ("+48", "🇵🇱 Poland"),
+    ("+30", "🇬🇷 Greece"), ("+31", "🇳🇱 Netherlands"), ("+32", "🇧🇪 Belgium"),
+    ("+46", "🇸🇪 Sweden"), ("+47", "🇳🇴 Norway"), ("+45", "🇩🇰 Denmark"),
+    ("+358", "🇫🇮 Finland"), ("+351", "🇵🇹 Portugal"), ("+43", "🇦🇹 Austria"),
+    ("+41", "🇨🇭 Switzerland"), ("+420", "🇨🇿 Czechia"), ("+36", "🇭🇺 Hungary"),
+    ("+40", "🇷🇴 Romania"), ("+381", "🇷🇸 Serbia"), ("+385", "🇭🇷 Croatia"),
+    ("+387", "🇧🇦 Bosnia & Herzegovina"), ("+54", "🇦🇷 Argentina"), ("+56", "🇨🇱 Chile"),
+    ("+57", "🇨🇴 Colombia"), ("+51", "🇵🇪 Peru"), ("+58", "🇻🇪 Venezuela"),
+]
+# Sort longest prefix first so +880 matches before +8
+_PHONE_PREFIX_MAP.sort(key=lambda x: -len(x[0]))
+
+# Telegram language_code → country label
+_LANG_TO_COUNTRY: dict[str, str] = {
+    "bn": "🇧🇩 Bangladesh", "hi": "🇮🇳 India", "ur": "🇵🇰 Pakistan",
+    "ar": "🇸🇦 Saudi Arabia", "fa": "🇮🇷 Iran", "zh": "🇨🇳 China",
+    "zh-hans": "🇨🇳 China", "zh-hant": "🇹🇼 Taiwan", "pt": "🇧🇷 Brazil",
+    "pt-br": "🇧🇷 Brazil", "pt-pt": "🇵🇹 Portugal", "id": "🇮🇩 Indonesia",
+    "tr": "🇹🇷 Turkey", "ru": "🇷🇺 Russia", "de": "🇩🇪 Germany",
+    "fr": "🇫🇷 France", "it": "🇮🇹 Italy", "es": "🇪🇸 Spain",
+    "en": "🇺🇸 USA", "ja": "🇯🇵 Japan", "ko": "🇰🇷 South Korea",
+    "vi": "🇻🇳 Vietnam", "th": "🇹🇭 Thailand", "ms": "🇲🇾 Malaysia",
+    "uk": "🇺🇦 Ukraine", "pl": "🇵🇱 Poland", "ro": "🇷🇴 Romania",
+    "nl": "🇳🇱 Netherlands", "el": "🇬🇷 Greece", "sv": "🇸🇪 Sweden",
+    "da": "🇩🇰 Denmark", "fi": "🇫🇮 Finland", "nb": "🇳🇴 Norway",
+    "cs": "🇨🇿 Czechia", "sk": "🇸🇰 Slovakia", "hu": "🇭🇺 Hungary",
+    "bg": "🇧🇬 Bulgaria", "hr": "🇭🇷 Croatia", "sr": "🇷🇸 Serbia",
+    "he": "🇮🇱 Israel", "az": "🇦🇿 Azerbaijan", "uz": "🇺🇿 Uzbekistan",
+    "kk": "🇰🇿 Kazakhstan", "hy": "🇦🇲 Armenia", "ka": "🇬🇪 Georgia",
+    "ne": "🇳🇵 Nepal", "si": "🇱🇰 Sri Lanka", "my": "🇲🇲 Myanmar",
+    "km": "🇰🇭 Cambodia", "lo": "🇱🇦 Laos", "mn": "🇲🇳 Mongolia",
+    "tg": "🇹🇯 Tajikistan", "tk": "🇹🇲 Turkmenistan", "ky": "🇰🇬 Kyrgyzstan",
+    "am": "🇪🇹 Ethiopia", "sw": "🇰🇪 Kenya", "ha": "🇳🇬 Nigeria",
+    "yo": "🇳🇬 Nigeria", "ig": "🇳🇬 Nigeria",
+}
+
+
+def _guess_country(profile, lang_code: str) -> str | None:
+    """Guess country from saved phone prefix (priority) or Telegram language code."""
+    # 1. Try phone number prefix
+    phone = (profile.get("phone") or "") if profile else ""
+    if phone:
+        phone = phone.strip()
+        if not phone.startswith("+"):
+            phone = "+" + phone
+        for prefix, country in _PHONE_PREFIX_MAP:
+            if phone.startswith(prefix):
+                return country
+    # 2. Try language code
+    if lang_code:
+        country = _LANG_TO_COUNTRY.get(lang_code.lower())
+        if country:
+            return country
+        # Try base language (e.g. 'pt-br' → 'pt')
+        base = lang_code.split("-")[0].lower()
+        return _LANG_TO_COUNTRY.get(base)
+    return None
+
+
 def _mask(value: str) -> str:
     """Show only the first 4 and last 4 chars for privacy."""
     if not value:
@@ -178,24 +306,26 @@ async def profile_edit_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return AWAIT_PHONE_SHARE
         
     if field_key == "country":
+        # Guess country from phone number or Telegram language code
+        profile_data = await db.get_profile(update.effective_user.id)
+        lang_code = update.effective_user.language_code or ""
+        guessed = _guess_country(profile_data, lang_code)
+
+        hint = f"\n\n💡 *Detected country:* {guessed} (shown first)" if guessed else ""
         text = (
             f"🌍 *Select Your Country*\n\n"
-            f"Choose your country from the list below or type it manually.\n"
+            f"Choose from the full list or type your country manually.{hint}\n\n"
             f"_(Type /cancel to abort)_"
         )
-        countries = [
-            "🇺🇸 USA", "🇬🇧 UK", "🇨🇦 Canada", "🇦🇺 Australia", "🇮🇳 India", 
-            "🇵🇰 Pakistan", "🇧🇩 Bangladesh", "🇳🇬 Nigeria", "🇷🇺 Russia", 
-            "🇮🇷 Iran", "🇰🇵 North Korea", "🇾🇪 Yemen", "🇸🇾 Syria", 
-            "🇨🇳 China", "🇧🇷 Brazil", "🇮🇩 Indonesia", "🇹🇷 Turkey",
-            "🇪🇬 Egypt", "🇿🇦 South Africa", "🇲🇽 Mexico", "🇩🇪 Germany",
-            "🇫🇷 France", "🇮🇹 Italy", "🇪🇸 Spain", "🇦🇪 UAE", "🇸🇦 Saudi Arabia"
-        ]
-        # Arrange in a 2-column grid
-        rows = [[KeyboardButton(c1), KeyboardButton(c2)] for c1, c2 in zip(countries[0::2], countries[1::2])]
-        if len(countries) % 2 != 0:
-            rows.append([KeyboardButton(countries[-1])])
-        
+
+        # Put guessed country first, then the full list
+        ordered = ([guessed] + [c for c in ALL_COUNTRIES if c != guessed]) if guessed else list(ALL_COUNTRIES)
+
+        # Build 2-column grid
+        rows = [[KeyboardButton(c1), KeyboardButton(c2)] for c1, c2 in zip(ordered[0::2], ordered[1::2])]
+        if len(ordered) % 2 != 0:
+            rows.append([KeyboardButton(ordered[-1])])
+
         country_kbd = ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=True)
         await query.message.reply_text(text, parse_mode="Markdown", reply_markup=country_kbd)
         return EDIT_PROFILE_VALUE
