@@ -5,7 +5,10 @@ All SQL is here. Handlers import functions, never write raw SQL.
 Railway: add the Postgres plugin → DATABASE_URL is injected automatically.
 """
 import os
+import time
+import random
 import asyncpg
+from datetime import date
 from typing import Optional
 
 _pool: Optional[asyncpg.Pool] = None
@@ -17,7 +20,7 @@ async def get_pool() -> asyncpg.Pool:
         url = os.environ["DATABASE_URL"]
         # Railway injects postgres:// but asyncpg needs postgresql://
         url = url.replace("postgres://", "postgresql://", 1)
-        _pool = await asyncpg.create_pool(url, min_size=2, max_size=10)
+        _pool = await asyncpg.create_pool(url, min_size=1, max_size=3)
     return _pool
 
 
@@ -185,7 +188,7 @@ async def init_schema():
 
         # Seed fake users if they don't exist
         # We use negative user_ids (-1001 to -1050)
-        import random
+
         fake_count = await conn.fetchval("SELECT COUNT(*) FROM users WHERE user_id < 0")
         if fake_count == 0:
             names = [
@@ -366,14 +369,25 @@ async def get_weekly_referrals(user_id: int) -> int:
             user_id
         )
 
+_settings_cache: dict[str, tuple[str, float]] = {}
+_SETTINGS_TTL = 60  # seconds
+
+
 async def get_setting(key: str, default: str) -> str:
+    now = time.time()
+    cached = _settings_cache.get(key)
+    if cached and (now - cached[1]) < _SETTINGS_TTL:
+        return cached[0]
     pool = await get_pool()
     async with pool.acquire() as conn:
         val = await conn.fetchval("SELECT value FROM settings WHERE key=$1", key)
-        return val if val else default
+    result = val if val else default
+    _settings_cache[key] = (result, now)
+    return result
 
 
 async def set_setting(key: str, value: str):
+    _settings_cache.pop(key, None)
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute(
@@ -384,7 +398,7 @@ async def set_setting(key: str, value: str):
 
 async def claim_daily_bonus(user_id: int) -> tuple[bool, str, float]:
     """Returns (success, reason, amount_credited). Uses tiered daily bonus."""
-    from datetime import date
+
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT last_daily, tasks_done FROM users WHERE user_id=$1", user_id)

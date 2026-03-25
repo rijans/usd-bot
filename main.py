@@ -1,5 +1,8 @@
 import logging
 import os
+import asyncio
+import datetime
+import traceback
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest, Conflict
@@ -49,7 +52,7 @@ from handlers.groups import nav_groups, group_callback
 
 logging.basicConfig(
     format="%(asctime)s  %(levelname)-8s  %(name)s - %(message)s",
-    level=logging.INFO,
+    level=getattr(logging, os.environ.get("LOG_LEVEL", "WARNING")),
 )
 log = logging.getLogger(__name__)
 
@@ -64,7 +67,6 @@ async def daily_bonus_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
             keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🎁 Claim Daily Bonus", callback_data="earnings:daily")]])
             try:
                 await context.bot.send_message(u["user_id"], msg, parse_mode="Markdown", reply_markup=keyboard)
-                import asyncio
                 await asyncio.sleep(0.05) # Safe rate limit: 20 msgs per sec
             except Exception:
                 pass
@@ -79,7 +81,6 @@ async def test_daily_job(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def cleanup_deleted_accounts(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Check all users — if Telegram says 'deactivated', delete them from DB."""
-    import asyncio
     user_ids = await db.get_all_real_user_ids()
     deleted_count = 0
     for uid in user_ids:
@@ -139,7 +140,6 @@ async def finish_lucky_draw_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             try:
                 await context.bot.send_message(uid, msg, reply_markup=keyboard, parse_mode="HTML")
                 count += 1
-                import asyncio
                 await asyncio.sleep(0.05)
             except Exception:
                 pass
@@ -192,7 +192,6 @@ async def on_bot_removed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def auto_promote_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     """Runs every 5 minutes. Posts referral links in due groups."""
-    import asyncio
     from core.ui import invite_link as build_invite_link, BOT_USERNAME
     groups = await db.get_groups_due_for_promotion()
     for g in groups:
@@ -235,7 +234,6 @@ async def post_init(application: Application) -> None:
             log.error(f"Migration error: {e}")
     
     # Schedule daily bonus reminder at 10:00 UTC
-    import datetime
     t = datetime.time(hour=10, minute=0, tzinfo=datetime.timezone.utc)
     application.job_queue.run_daily(daily_bonus_reminder, t)
     log.info(f"Daily job scheduled at {t} UTC")
@@ -279,7 +277,6 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     log.error("Unhandled exception", exc_info=err)
     
     # Notify admins
-    import traceback
     admin_ids = os.environ.get("ADMIN_IDS", "")
     if admin_ids:
         admins = [int(x.strip()) for x in admin_ids.split(",") if x.strip().isdigit()]
