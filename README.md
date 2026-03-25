@@ -20,10 +20,10 @@ Stack: **Python 3.12 · python-telegram-bot 21 (job-queue) · asyncpg · Postgre
 | 📜 Transaction History | Full earning history with privacy-masked Telegram IDs |
 | 💸 Withdrawals | TON, USDT, Telegram Stars, PayPal — admin review + reject-with-reason + auto-refund |
 | 🛡️ Support Tickets | Users can submit feedback/complaints via the FAQ menu. Admins review, reply via Push Notifications, and resolve in `/admin`. |
-| 🌍 Profile Countries | Users can select their real country (including sanctioned countries like Iran/Syria) which displays on their active profile. |
-| 🎰 Lucky Draw | Daily draw where users pay Telegram Stars (50/100/150/300) to enter. 3 fake users always win; prize amounts ($200/$70/$30) are **admin-configurable**. |
-| 🔧 Admin Panel | Tasks, withdrawals, broadcast, tickets, **Lucky Draw stats + buyer history**, full stats (**real users only**), and all configurable reward settings |
-| 📊 Full Stats (Admin) | Accurate view of real user counts, balance owed, top inviters/earners — fake users fully excluded |
+| 🌍 Profile & Privacy | User ID display, native **Share Location/Contact** buttons, and privacy-masked referral notifications |
+| 🎰 Lucky Draw | Daily draw where users pay Telegram Stars (50/100/150/300) to enter. 3 fake users always win; prize amounts are **admin-configurable**. |
+| 🔧 Admin Panel | Advanced **paginated User Lookup** (filterable), **Promoted Groups explorer** (generate invite links), task management, and stats |
+| 📊 Full Stats (Admin) | Grid-based administrative menu with real-time growth charts and accurate real-user metrics |
 
 ---
 
@@ -179,12 +179,14 @@ You can also **edit** the title, chat ID, or link of existing tasks, and **activ
 
 | Command / Button | Description |
 |---|---|
-| `/admin` | Open admin panel |
+| `/admin` | Open compact 2-column admin panel |
 | 📋 Manage Tasks | Add, edit, toggle, or delete channel tasks |
 | 💸 Withdrawals | Review pending requests — Mark Paid or Reject with a reason |
 | 📢 Broadcast | Send a message to all users |
-| 📊 Full Stats | Real-users-only stats: total users, active users, balance owed, top inviters/earners |
-| ⚙️ Settings | Edit all reward settings + toggle Fake Leaderboard |
+| 🔍 Lookup User | **Advanced Paginated Search:** Filter by Profiles, Referrals, or Earnings |
+| 📢 Promoted Groups| View all groups where the bot is admin + **dynamically generate invite links** |
+| 📊 Full Stats | Real-users-only stats + **ASCII Growth Charts** for joins/completions |
+| ⚙️ Settings | Edit all rewards, toggle Fake Leaderboard, and **Admin Notification Alerts** |
 
 ### Configurable Settings (via Admin Panel ⚙️)
 
@@ -200,6 +202,7 @@ All reward amounts and thresholds are editable at runtime — no redeployment ne
 | Referral Reward Primary | `$0.30` | Referral reward for the first N invites |
 | Referral Reward Secondary | `$0.05` | Referral reward after threshold |
 | Referral Reward Threshold | `5` | Number of referrals at the primary rate |
+| Admin Alerts | `ON` | Receive bot notifications when a user completes all tasks |
 | Fake Leaderboard | `ON` | Show/hide pre-seeded fake users in leaderboards |
 
 ### Admin-Only Commands
@@ -270,3 +273,7 @@ To make the bot look active before you have real users, 50 pre-seeded fake users
 **Parallel membership checks** — `core/ui.py:check_all_tasks()` uses `asyncio.gather()` to verify all channels simultaneously.
 
 **Admin stats exclude fake users** — The `📊 Full Stats` screen always bypasses the `show_fake_leaders` toggle so admins see accurate growth metrics.
+
+**Data Integrity (CASCADE)** — Critical tables like `task_completions` and `withdrawals` use `ON DELETE CASCADE` on foreign keys, ensuring background user cleanups never trigger foreign key violations.
+
+**Bot Stability (Command Fallback)** — The `/admin` command is registered as a fallback in conversation handlers, allowing admins to forcibly reset their state and reload the panel if they get stuck in a sub-prompt.
