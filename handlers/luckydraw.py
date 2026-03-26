@@ -167,12 +167,12 @@ async def show_past_winners(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except BadRequest:
         pass
     
-    winners = await get_past_lucky_draw_winners(limit=5)
+    winners = await get_past_lucky_draw_winners(limit=3)
     
     if not winners:
-        text = "🎁 <b>Recent Lucky Draw Winners</b>\n\n<i>No draws have concluded yet. Check back tomorrow!</i>"
+        text = "🎁 <b>Last 3 Lucky Draw Winners</b>\n\n<i>No draws have concluded yet. Check back tomorrow!</i>"
     else:
-        text = "🎁 <b>Recent Lucky Draw Winners</b>\n\n"
+        text = "🎁 <b>Last 3 Lucky Draw Winners</b>\n\n"
         for w in winners:
             date_str = w["draw_date"].strftime("%Y-%m-%d")
             text += f"📅 <b>{date_str}</b>\n"
