@@ -18,6 +18,7 @@ from telegram.ext import (
 )
 
 import core.db as db
+import core.sysinfo as sysinfo
 from handlers.start    import cmd_start, nav_start
 from handlers.tasks    import nav_tasks, task_view, task_verify
 from handlers.earnings import nav_earnings, claim_daily, show_leaderboard, nav_history
@@ -254,6 +255,10 @@ async def post_init(application: Application) -> None:
     ld_t = datetime.time(hour=23, minute=58, tzinfo=datetime.timezone.utc)
     application.job_queue.run_daily(finish_lucky_draw_job, ld_t)
     log.info(f"Daily Lucky Draw resolution scheduled at {ld_t} UTC")
+
+    # Record bot start time for uptime tracking
+    sysinfo.set_start_time()
+    log.info("Bot ready.")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:

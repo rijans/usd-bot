@@ -22,6 +22,7 @@ from telegram.ext import ContextTypes, ConversationHandler, filters, MessageHand
 
 import core.db as db
 from core.ui import fmt_balance
+import core.sysinfo as sysinfo
 
 from handlers.groups import nav_groups, group_callback
 from handlers.profile import _profile_text
@@ -91,6 +92,7 @@ def _admin_keyboard():
          InlineKeyboardButton("📈 Growth Stats", callback_data="adm:growth_stats")],
         [InlineKeyboardButton("📊 Full Stats", callback_data="adm:stats"),
          InlineKeyboardButton("📢 Promoted Groups", callback_data="adm:groups")],
+        [InlineKeyboardButton("🖥 Server Status", callback_data="adm:server")],
     ])
 
 
@@ -216,6 +218,17 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
 
     if data == "adm:growth_stats":
         await _show_growth_stats(query)
+        return ConversationHandler.END
+
+    if data == "adm:server":
+        text = sysinfo.format_server_status()
+        await query.edit_message_text(
+            text, parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Refresh", callback_data="adm:server"),
+                 InlineKeyboardButton("⬅️ Back", callback_data="adm:back")]
+            ])
+        )
         return ConversationHandler.END
 
     await query.answer()
