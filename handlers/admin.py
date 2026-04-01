@@ -21,7 +21,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler, filters, MessageHandler, CommandHandler
 
 import core.db as db
-from core.ui import fmt_balance
+from core.ui import fmt_balance, clean_md
 import core.sysinfo as sysinfo
 
 from handlers.groups import nav_groups, group_callback
@@ -411,8 +411,9 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
         text = f"✉️ *Open Support Tickets* ({len(tickets)})\n\n"
         buttons = []
         for t in tickets:
-            name = (t["full_name"] or "User")[:20]
-            snippet = t["message"][:30].replace("\n", " ") + "…"
+            name = clean_md(t["full_name"] or "User")[:20]
+            safe_msg = clean_md(t["message"])
+            snippet = safe_msg[:30].replace("\n", " ") + "…"
             buttons.append([InlineKeyboardButton(f"#{t['id']} {name}: {snippet}", callback_data=f"adm:ticket_view:{t['id']}")])
         buttons.append([InlineKeyboardButton("⬅️ Back", callback_data="adm:back")])
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
@@ -424,18 +425,18 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
         if not ticket:
             await query.answer("Ticket not found.", show_alert=True)
             return ConversationHandler.END
-        name = ticket["full_name"] or "?"
-        uname = f"@{ticket['username']}" if ticket["username"] else f"ID:{ticket['user_id']}"
+        name = clean_md(ticket["full_name"] or "?")
+        uname = clean_md(f"@{ticket['username']}") if ticket["username"] else f"ID:{ticket['user_id']}"
         created = ticket["created_at"].strftime("%d %b %H:%M")
         text = (
             f"✉️ *Ticket #{ticket['id']}*\n"
             f"From: {name} ({uname})\n"
             f"Date: {created}\n"
             f"Status: {ticket['status']}\n\n"
-            f"💬 *Message:*\n{ticket['message']}"
+            f"💬 *Message:*\n{clean_md(ticket['message'])}"
         )
         if ticket["reply"]:
-            text += f"\n\n↩️ *Admin reply:*\n{ticket['reply']}"
+            text += f"\n\n↩️ *Admin reply:*\n{clean_md(ticket['reply'])}"
         buttons = [
             [InlineKeyboardButton("↩️ Reply", callback_data=f"adm:ticket_reply:{ticket_id}"),
              InlineKeyboardButton("✅ Mark Solved", callback_data=f"adm:ticket_close:{ticket_id}")],
@@ -660,7 +661,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, ove
         else:
             text = "🎰 *Lucky Draw Buyer History (Last 20)*\n\n"
             for row in history:
-                name = row['full_name'] or row['username'] or str(row['user_id'])
+                name = clean_md(row['full_name'] or row['username'] or str(row['user_id']))
                 date_str = row['draw_date'].strftime("%b %d")
                 text += f"⭐ {row['stars_paid']} | {name} | {date_str}\n"
         await query.edit_message_text(
@@ -930,7 +931,7 @@ async def _show_withdrawals(query):
     for w in withdrawals[:5]:
         text = (
             f"💸 *Withdrawal #{w['id']}*\n\n"
-            f"👤 {w['full_name']} (`{w['user_id']}`)\n"
+            f"👤 {clean_md(w['full_name'])} (`{w['user_id']}`)\n"
             f"💵 Amount: {fmt_balance(w['amount'])}\n"
             f"📤 Method: {w['method']}\n"
             f"🔑 To: `{w['destination']}`\n"

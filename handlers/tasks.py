@@ -13,7 +13,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 import core.db as db
-from core.ui import nav_keyboard, check_all_tasks, progress_bar, fmt_balance, mask_id
+from core.ui import nav_keyboard, check_all_tasks, progress_bar, fmt_balance, mask_id, clean_md
 
 log = logging.getLogger(__name__)
 
@@ -189,7 +189,7 @@ async def task_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_message(
                     user["referred_by"],
                     f"🎉 *Referral Reward!*\n\n"
-                    f"Your referral *{masked_name}* completed all tasks!\n"
+                    f"Your referral *{clean_md(masked_name)}* completed all tasks!\n"
                     f"💰 *+{fmt_balance(ref_amt)}* has been added to your balance.",
                     parse_mode="Markdown",
                 )
@@ -205,8 +205,9 @@ async def task_verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_message(
                         admin_id,
                         f"🔔 *Admin Alert: Task Milestone*\n\n"
-                        f"User: *{user['full_name']}* (`{user_id}`)\n"
-                        f"Status: ✅ Completed all tasks."
+                        f"User: *{clean_md(user['full_name'])}* (`{user_id}`)\n"
+                        f"Status: ✅ Completed all tasks.",
+                        parse_mode="Markdown"
                     )
             except Exception:
                 pass

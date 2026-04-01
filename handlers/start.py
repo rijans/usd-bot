@@ -6,7 +6,7 @@ from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 import core.db as db
-from core.ui import nav_keyboard, BOT_NAME, fmt_balance, mask_id
+from core.ui import nav_keyboard, BOT_NAME, fmt_balance, mask_id, clean_md
 
 
 # Persistent bottom keyboard - always visible below the chat input
@@ -106,7 +106,7 @@ async def _send_home(update: Update, record, is_new=False):
 
     greeting = "🎉 Welcome" if is_new else "👋 Welcome back"
     text = (
-        f"{greeting}, *{record['full_name']}*!\n\n"
+        f"{greeting}, *{clean_md(record['full_name'])}*!\n\n"
         f"✦ *{BOT_NAME}*\n"
         f"The generous earning bot on Telegram\n\n"
     )

@@ -7,7 +7,7 @@ from telegram.ext import ContextTypes
 from datetime import date
 
 import core.db as db
-from core.ui import nav_keyboard, fmt_balance, progress_bar
+from core.ui import nav_keyboard, fmt_balance, progress_bar, clean_md
 
 MEDALS = ["🥇", "🥈", "🥉"]
 
@@ -78,7 +78,7 @@ async def nav_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         top = await db.get_leaderboard(5)
         for i, u in enumerate(top, 1):
             medal = MEDALS[i - 1] if i <= 3 else f"{i}."
-            name = (u["full_name"] or "User")[:20]
+            name = clean_md(u["full_name"] or "User")[:20]
             text += f"{medal} {name} — 💵 {fmt_balance(u['balance'])}\n"
 
         buttons = []
@@ -160,7 +160,7 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i, u in enumerate(top, 1):
         medal = MEDALS[i - 1] if i <= 3 else f"{i}."
         prize = {1: "$10", 2: "$10", 3: "$10"}.get(i, "$5" if i <= 10 else "$3")
-        name = (u["full_name"] or "User")[:20]
+        name = clean_md(u["full_name"] or "User")[:20]
         text += f"{medal} {name} — 💵 {fmt_balance(u['balance'])} (Prize: {prize})\n"
 
     text += (

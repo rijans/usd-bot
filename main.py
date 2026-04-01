@@ -3,6 +3,7 @@ import os
 import asyncio
 import datetime
 import traceback
+import html
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import BadRequest, Conflict
@@ -59,11 +60,12 @@ log = logging.getLogger(__name__)
 
 
 async def daily_bonus_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
+    from core.ui import clean_md
     pool = await db.get_pool()
     async with pool.acquire() as conn:
         users = await conn.fetch("SELECT user_id, full_name FROM users WHERE user_id > 0 AND (last_daily IS NULL OR last_daily < CURRENT_DATE)")
         for u in users:
-            name = u["full_name"] or "User"
+            name = clean_md(u["full_name"] or "User")
             msg = f"🎁 *Your daily bonus is ready, {name}!*\n\nClaim it now from the 💰 Earnings menu! (Requires 2 invites this week to activate)"
             keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("🎁 Claim Daily Bonus", callback_data="earnings:daily")]])
             try:
@@ -286,10 +288,10 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     if admin_ids:
         admins = [int(x.strip()) for x in admin_ids.split(",") if x.strip().isdigit()]
         tb_str = "".join(traceback.format_exception(None, err, err.__traceback__))
-        err_msg = f"❌ *Unhandled Exception*\n\n`{tb_str[-1000:]}`" # Sent last 1000 chars of traceback
+        err_msg = f"❌ <b>Unhandled Exception</b>\n\n<pre><code>{html.escape(tb_str[-3000:])}</code></pre>"
         for admin_id in admins:
             try:
-                await context.bot.send_message(admin_id, err_msg, parse_mode="Markdown")
+                await context.bot.send_message(admin_id, err_msg, parse_mode="HTML")
             except Exception:
                 pass
 

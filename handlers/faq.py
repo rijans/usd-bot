@@ -5,7 +5,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 
 import core.db as db
-from core.ui import fmt_balance
+from core.ui import fmt_balance, clean_md
 
 # Conversation state
 TICKET_WRITE = 60  # Waiting for user to type their complaint/feedback
@@ -232,10 +232,11 @@ async def ticket_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines = ["📂 *My Support Tickets*\n"]
     for t in tickets:
         icon = STATUS_ICONS.get(t["status"], t["status"])
-        snippet = t["message"][:60] + ("…" if len(t["message"]) > 60 else "")
+        safe_msg = clean_md(t["message"])
+        snippet = safe_msg[:60] + ("…" if len(safe_msg) > 60 else "")
         lines.append(f"*#{t['id']}* {icon}\n_{snippet}_")
         if t["reply"]:
-            lines.append(f"↩️ *Admin reply:* {t['reply'][:100]}")
+            lines.append(f"↩️ *Admin reply:* {clean_md(t['reply'])[:100]}")
         lines.append("")
 
     await query.edit_message_text(

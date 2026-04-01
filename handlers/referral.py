@@ -9,7 +9,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 import core.db as db
-from core.ui import nav_keyboard, invite_link as build_invite, fmt_balance, BOT_NAME
+from core.ui import nav_keyboard, invite_link as build_invite, fmt_balance, BOT_NAME, clean_md
 
 
 async def nav_share(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -63,7 +63,7 @@ async def _render_refer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     for i, u in enumerate(top, 1):
         medals = ["🥇", "🥈", "🥉"]
-        name = (u["full_name"] or "User")[:20]
+        name = clean_md(u["full_name"] or "User")[:20]
         text += f"{medals[i-1]} {name}\n"
 
     share_text = (
